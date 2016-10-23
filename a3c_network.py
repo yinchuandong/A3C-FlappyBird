@@ -4,7 +4,7 @@ import numpy as np
 from netutil import *
 
 
-class A3CNetwork(object):
+class A3CFFNetwork(object):
 
     def __init__(self, state_dim, state_chn, action_dim, device='/cpu:0'):
         self._state_dim = state_dim
@@ -83,7 +83,7 @@ class A3CNetwork(object):
 
 
 if __name__ == '__main__':
-    net = A3CNetwork(84, 3, 2)
+    net = A3CFFNetwork(84, 3, 2)
     net.create_network()
     net.create_loss(0.01)
     print 'a3c_network.py'
