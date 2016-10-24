@@ -1,11 +1,13 @@
 import pygame
 import sys
+
+
 def load():
     # path of player with different states
     PLAYER_PATH = (
-            'assets/sprites/redbird-upflap.png',
-            'assets/sprites/redbird-midflap.png',
-            'assets/sprites/redbird-downflap.png'
+        'assets/sprites/redbird-upflap.png',
+        'assets/sprites/redbird-midflap.png',
+        'assets/sprites/redbird-downflap.png'
     )
 
     # path of background
@@ -39,11 +41,11 @@ def load():
     else:
         soundExt = '.ogg'
 
-    SOUNDS['die']    = pygame.mixer.Sound('assets/audio/die' + soundExt)
-    SOUNDS['hit']    = pygame.mixer.Sound('assets/audio/hit' + soundExt)
-    SOUNDS['point']  = pygame.mixer.Sound('assets/audio/point' + soundExt)
+    SOUNDS['die'] = pygame.mixer.Sound('assets/audio/die' + soundExt)
+    SOUNDS['hit'] = pygame.mixer.Sound('assets/audio/hit' + soundExt)
+    SOUNDS['point'] = pygame.mixer.Sound('assets/audio/point' + soundExt)
     SOUNDS['swoosh'] = pygame.mixer.Sound('assets/audio/swoosh' + soundExt)
-    SOUNDS['wing']   = pygame.mixer.Sound('assets/audio/wing' + soundExt)
+    SOUNDS['wing'] = pygame.mixer.Sound('assets/audio/wing' + soundExt)
 
     # select random background sprites
     IMAGES['background'] = pygame.image.load(BACKGROUND_PATH).convert()
@@ -77,11 +79,12 @@ def load():
 
     return IMAGES, SOUNDS, HITMASKS
 
+
 def getHitmask(image):
     """returns a hitmask using an image's alpha."""
     mask = []
     for x in range(image.get_width()):
         mask.append([])
         for y in range(image.get_height()):
-            mask[x].append(bool(image.get_at((x,y))[3]))
+            mask[x].append(bool(image.get_at((x, y))[3]))
     return mask

@@ -11,9 +11,10 @@ class A3CFFNetwork(object):
         self._state_chn = state_chn
         self._action_dim = action_dim
         self._device = device
+        self._create_network()
         return
 
-    def create_network(self):
+    def _create_network(self):
         state_dim = self._state_dim
         state_chn = self._state_chn
         action_dim = self._action_dim
@@ -81,9 +82,44 @@ class A3CFFNetwork(object):
         self.total_loss = policy_loss + value_loss
         return
 
+    def get_total_loss(self):
+        return self.total_loss
+
+    def get_vars(self):
+        return [
+            self.W_conv1, self.b_conv1,
+            self.W_conv2, self.b_conv2,
+            self.W_conv3, self.b_conv3,
+            self.W_fc1, self.b_fc1,
+            self.W_fc2, self.b_fc2,
+            self.W_fc3, self.b_fc3
+        ]
+
+    def sync_from(self, src_network, name=None):
+        src_vars = src_network.get_vars()
+        dst_vars = self.get_vars()
+
+        sync_ops = []
+        with tf.device(self._device):
+            with tf.name_scope(name, 'A3CFFNetwork') as scope:
+                for (src_var, dst_var) in zip(src_vars, dst_vars):
+                    sync_ops.append(tf.assign(dst_var, src_var))
+                return tf.group(*sync_ops, name=scope)
+
+    def run_policy_and_value(self, sess, state):
+        policy, value = sess.run([self.policy_output, self.value_output], feed_dict={self.state_input: [state]})
+        return policy[0], value[0]
+
+    def run_policy(self, sess, state):
+        policy = sess.run([self.policy_output], feed_dict={self.state_input: [state]})
+        return policy[0]
+
+    def run_value(self, sess, state):
+        value = sess.run([self.value_output], feed_dict={self.state_input: [state]})
+        return value[0]
+
 
 if __name__ == '__main__':
     net = A3CFFNetwork(84, 3, 2)
-    net.create_network()
     net.create_loss(0.01)
     print 'a3c_network.py'

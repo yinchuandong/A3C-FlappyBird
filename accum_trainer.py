@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-class Trainer(object):
+class AccumTrainer(object):
 
     def __init__(self, device='/cpu:0', name='Trainer'):
         self._device = device
@@ -44,8 +44,16 @@ class Trainer(object):
                 return tf.group(*accum_ops, name=scope)
 
     def reset_gradients(self, name=None):
+        with tf.device(self._device):
+            reset_ops = []
+            with tf.name_scope(name, self._name) as scope:
+                for var, accum_grad in zip(self._var_list, self._accum_grad_list):
+                    with tf.name_scope('reset_' + var.op.name):
+                        zero = tf.zeros(var.get_shape())
+                        reset = accum_grad.assign(zero)
+                        reset_ops.append(reset)
+                return tf.group(*reset_ops, name=scope)
 
-        return
 
 if __name__ == '__main__':
     print 'he'
