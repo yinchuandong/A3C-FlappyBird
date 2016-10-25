@@ -7,6 +7,8 @@ import pygame.surfarray as surfarray
 from pygame.locals import *
 from itertools import cycle
 
+from PIL import Image
+
 FPS = 30
 SCREENWIDTH = 288
 SCREENHEIGHT = 512
@@ -56,6 +58,8 @@ class GameState:
         self.playerAccY = 1   # players downward accleration
         self.playerFlapAcc = -9   # players speed on flapping
         self.playerFlapped = False  # True when player flaps
+        self.reset()
+        return
 
     def frame_step(self, input_actions):
         pygame.event.pump()
@@ -143,6 +147,33 @@ class GameState:
         FPSCLOCK.tick(FPS)
         # print self.upperPipes[0]['y'] + PIPE_HEIGHT - int(BASEY * 0.2)
         return image_data, reward, terminal
+
+    def reset(self):
+        action = np.zeros([2])
+        action[0] = 1
+        x_t, reward, terminal = self.frame_step(action)
+        x_t = Image.fromarray(x_t).convert('L')
+        x_t = x_t.resize((84, 84), Image.ANTIALIAS)
+        self.s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
+        self.reward = reward
+        self.terminal = terminal
+        return
+
+    def process(self, actionId):
+        action = np.zeros([2])
+        action[actionId] = 1
+        x_t1, reward, terminal = self.frame_step(action)
+        x_t1 = Image.fromarray(x_t1).convert('L')
+        x_t1 = x_t1.resize((84, 84), Image.ANTIALIAS)
+        x_t1 = np.reshape(x_t1, (84, 84, 1))
+        self.s_t1 = np.append(self.s_t[:, :, 1:], x_t1, axis=2)
+        self.reward = reward
+        self.terminal = terminal
+        return
+
+    def update(self):
+        self.s_t = self.s_t1
+        return
 
 
 def getRandomPipe():
