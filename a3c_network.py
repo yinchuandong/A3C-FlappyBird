@@ -111,11 +111,11 @@ class A3CFFNetwork(object):
         return policy[0], value[0]
 
     def run_policy(self, sess, state):
-        policy = sess.run([self.policy_output], feed_dict={self.state_input: [state]})
+        policy = sess.run(self.policy_output, feed_dict={self.state_input: [state]})
         return policy[0]
 
     def run_value(self, sess, state):
-        value = sess.run([self.value_output], feed_dict={self.state_input: [state]})
+        value = sess.run(self.value_output, feed_dict={self.state_input: [state]})
         return value[0]
 
 

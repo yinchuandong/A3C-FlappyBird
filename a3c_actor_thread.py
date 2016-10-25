@@ -79,6 +79,8 @@ class A3CActorThread(object):
 
         for i in range(LOCAL_T_MAX):
             policy_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
+            # print 'policy=', policy_
+            # print 'value=', value_
             actionId = self.choose_action(policy_)
 
             states.append(self.game_state.s_t)
@@ -107,6 +109,8 @@ class A3CActorThread(object):
         R = 0.0
         if not terminal_end:
             R = self.local_network.run_value(sess, self.game_state.s_t)
+        # print 'R=', R
+        # print 'rewards=', rewards
 
         states.reverse()
         actions.reverse()
@@ -136,7 +140,7 @@ class A3CActorThread(object):
             self.local_network.R: batch_R
         })
 
-        cur_learning_rate = self._anneal_learning_rate(self.global_time_step)
+        cur_learning_rate = self._anneal_learning_rate(global_t)
         sess.run(self.apply_gradients, feed_dict={
             self.learning_rate_input: cur_learning_rate
         })

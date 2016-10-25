@@ -65,6 +65,8 @@ class A3C(object):
                 break
             diff_global_t = actor_thread.process(self.sess, self.global_t)
             self.global_t += diff_global_t
+            print 'global_t:', self.global_t
+        return
 
     def signal_handler(self, signal_, frame_):
         print 'You pressed Ctrl+C !'
