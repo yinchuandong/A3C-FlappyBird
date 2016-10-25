@@ -58,6 +58,13 @@ class A3C(object):
             print("Could not find old checkpoint")
         return
 
+    def backup(self):
+        if not os.path.exists(CHECKPOINT_DIR):
+            os.mkdir(CHECKPOINT_DIR)
+
+        self.saver.save(self.sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step=self.global_t)
+        return
+
     def train_function(self, parallel_index):
         actor_thread = self.actor_threads[parallel_index]
         while True:
@@ -65,7 +72,9 @@ class A3C(object):
                 break
             diff_global_t = actor_thread.process(self.sess, self.global_t)
             self.global_t += diff_global_t
-            print 'global_t:', self.global_t
+            if self.global_t % 10000 < LOCAL_T_MAX:
+                self.backup()
+            # print 'global_t:', self.global_t
         return
 
     def signal_handler(self, signal_, frame_):
@@ -90,10 +99,7 @@ class A3C(object):
         for t in train_treads:
             t.join()
 
-        if not os.path.exists(CHECKPOINT_DIR):
-            os.mkdir(CHECKPOINT_DIR)
-
-        self.saver.save(self.sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step=self.global_t)
+        self.backup()
         return
 
 

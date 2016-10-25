@@ -109,8 +109,7 @@ class A3CActorThread(object):
         R = 0.0
         if not terminal_end:
             R = self.local_network.run_value(sess, self.game_state.s_t)
-        # print 'R=', R
-        # print 'rewards=', rewards
+        print ('global_t: %d, R: %f') % (global_t, R)
 
         states.reverse()
         actions.reverse()
