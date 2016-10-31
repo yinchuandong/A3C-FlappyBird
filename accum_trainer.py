@@ -4,7 +4,7 @@ import numpy as np
 
 class AccumTrainer(object):
 
-    def __init__(self, device='/cpu:0', name='Trainer'):
+    def __init__(self, device='/cpu:0', name='AccumTrainer'):
         self._device = device
         self._name = name
         return
@@ -49,7 +49,7 @@ class AccumTrainer(object):
             with tf.name_scope(name, self._name) as scope:
                 for var, accum_grad in zip(self._var_list, self._accum_grad_list):
                     with tf.name_scope('reset_' + var.op.name):
-                        zero = tf.zeros(var.get_shape())
+                        zero = tf.zeros(accum_grad.get_shape())
                         reset = accum_grad.assign(zero)
                         reset_ops.append(reset)
                 return tf.group(*reset_ops, name=scope)
