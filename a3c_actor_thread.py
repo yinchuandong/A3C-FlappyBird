@@ -80,7 +80,8 @@ class A3CActorThread(object):
         sess.run(self.sync)
 
         start_local_t = self.local_t
-        start_lstm_state = self.local_network.lstm_state_out
+        if USE_LSTM:
+            start_lstm_state = self.local_network.lstm_state_out
 
         for i in range(LOCAL_T_MAX):
             policy_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
