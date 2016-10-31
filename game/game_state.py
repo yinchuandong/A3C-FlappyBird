@@ -9,7 +9,7 @@ from itertools import cycle
 
 from PIL import Image
 
-FPS = 30
+FPS = 60
 SCREENWIDTH = 288
 SCREENHEIGHT = 512
 

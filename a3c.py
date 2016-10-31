@@ -7,7 +7,7 @@ import math
 import threading
 import signal
 
-from a3c_network import A3CFFNetwork
+from a3c_network import A3CFFNetwork, A3CLSTMNetwork
 from a3c_actor_thread import A3CActorThread
 
 from config import *
@@ -26,7 +26,10 @@ class A3C(object):
         self.device = '/gpu:0' if USE_GPU else '/cpu:0'
         self.stop_requested = False
         self.global_t = 0
-        self.global_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device)
+        if USE_LSTM:
+            self.global_network = A3CLSTMNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device, -1)
+        else:
+            self.global_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device)
 
         self.initial_learning_rate = log_uniform(INITIAL_ALPHA_LOW, INITIAL_ALPHA_HIGH, INITIAL_ALPHA_LOG_RATE)
         self.learning_rate_input = tf.placeholder('float')
