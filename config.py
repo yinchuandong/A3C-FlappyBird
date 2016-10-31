@@ -16,6 +16,7 @@ INITIAL_ALPHA_HIGH = 1e-2   # log_uniform high limit for learning rate
 INITIAL_ALPHA_LOG_RATE = 0.4226  # log_uniform interpolate rate for learning rate (around 7 * 10^-4)
 
 PARALLEL_SIZE = 1  # parallel thread size
-USE_GPU = True
+USE_GPU = False
+USE_LSTM = True
 CHECKPOINT_DIR = 'checkpoints'
 

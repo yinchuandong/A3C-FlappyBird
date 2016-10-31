@@ -3,7 +3,7 @@ import numpy as np
 import random
 
 from accum_trainer import AccumTrainer
-from a3c_network import A3CFFNetwork
+from a3c_network import A3CFFNetwork, A3CLSTMNetwork
 from config import *
 from game.game_state import GameState
 
@@ -24,10 +24,13 @@ class A3CActorThread(object):
         self.learning_rate_input = learning_rate_input
         self.max_global_time_step = max_global_time_step
 
-        self.local_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device)
+        if USE_LSTM:
+            self.local_network = A3CLSTMNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device, thread_index)
+        else:
+            self.local_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device)
         self.local_network.create_loss(ENTROPY_BETA)
         self.trainer = AccumTrainer(device)
-        self.trainer.create_minimize(self.local_network.get_total_loss(), self.local_network.get_vars())
+        self.trainer.create_minimize(self.local_network.total_loss, self.local_network.get_vars())
         self.accum_gradients = self.trainer.accumulate_gradients()
         self.reset_gradients = self.trainer.reset_gradients()
 
@@ -75,7 +78,10 @@ class A3CActorThread(object):
         sess.run(self.reset_gradients)
         # copy weight from global network
         sess.run(self.sync)
+
         start_local_t = self.local_t
+        if USE_LSTM:
+            start_lstm_state = self.local_network.lstm_state_out
 
         for i in range(LOCAL_T_MAX):
             policy_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
@@ -103,6 +109,8 @@ class A3CActorThread(object):
                 terminal_end = True
                 self.episode_reward = 0.0
                 self.game_state.reset()
+                if USE_LSTM:
+                    self.local_network.reset_lstm_state()
                 break
         # -----------end of batch (LOCAL_T_MAX)--------------------
 
@@ -132,12 +140,26 @@ class A3CActorThread(object):
             batch_td.append(td)
             batch_R.append(R)
 
-        sess.run(self.accum_gradients, feed_dict={
-            self.local_network.state_input: batch_state,
-            self.local_network.action_input: batch_action,
-            self.local_network.td: batch_td,
-            self.local_network.R: batch_R
-        })
+        if USE_LSTM:
+            batch_state.reverse()
+            batch_action.reverse()
+            batch_td.reverse()
+            batch_R.reverse()
+            sess.run(self.accum_gradients, feed_dict={
+                self.local_network.state_input: batch_state,
+                self.local_network.action_input: batch_action,
+                self.local_network.td: batch_td,
+                self.local_network.R: batch_R,
+                self.local_network.step_size: [LOCAL_T_MAX],
+                self.local_network.initial_lstm_state: start_lstm_state
+            })
+        else:
+            sess.run(self.accum_gradients, feed_dict={
+                self.local_network.state_input: batch_state,
+                self.local_network.action_input: batch_action,
+                self.local_network.td: batch_td,
+                self.local_network.R: batch_R
+            })
 
         cur_learning_rate = self._anneal_learning_rate(global_t)
         sess.run(self.apply_gradients, feed_dict={
