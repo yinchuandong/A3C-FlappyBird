@@ -256,7 +256,9 @@ class A3CLSTMNetwork(A3CNetwork):
         return policy[0]
 
     def run_value(self, sess, state):
-        value, self.lstm_state_out = sess.run(
+        # don't need to change state
+        prev_lstm_state_out = self.lstm_state_out
+        value, _ = sess.run(
             [self.value_output, self.lstm_state],
             feed_dict={
                 self.state_input: [state],
@@ -264,6 +266,7 @@ class A3CLSTMNetwork(A3CNetwork):
                 self.step_size: [1]
             }
         )
+        self.lstm_state_out = prev_lstm_state_out
         return value[0]
 
 
