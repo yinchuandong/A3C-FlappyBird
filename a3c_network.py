@@ -164,24 +164,28 @@ class A3CLSTMNetwork(A3CNetwork):
             self.b_conv2 = bias_variable([32])
             h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
 
-            # conv3
-            self.W_conv3 = weight_variable([3, 3, 32, 64])
-            self.b_conv3 = bias_variable([64])
-            h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
+            h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
+            print 'h_conv2_out_size', h_conv2_out_size
+            h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
 
-            h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-            print 'h_conv3_out_size', h_conv3_out_size
-            h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+            # conv3
+            # self.W_conv3 = weight_variable([3, 3, 32, 64])
+            # self.b_conv3 = bias_variable([64])
+            # h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
+
+            # h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
+            # print 'h_conv3_out_size', h_conv3_out_size
+            # h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
 
             # fc1
-            self.W_fc1 = weight_variable([h_conv3_out_size, 512])
-            self.b_fc1 = bias_variable([512])
-            h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, self.W_fc1) + self.b_fc1)
+            self.W_fc1 = weight_variable([h_conv2_out_size, 256])
+            self.b_fc1 = bias_variable([256])
+            h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
 
-            # reshape to fit lstm (1, 5, 512)
-            h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, 512])
+            # reshape to fit lstm (1, 5, 256)
+            h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, 256])
 
-            self.lstm = CustomBasicLSTMCell(512)
+            self.lstm = CustomBasicLSTMCell(256)
             self.step_size = tf.placeholder('float', [1])
             self.initial_lstm_state = tf.placeholder('float', [1, self.lstm.state_size])
             scope = 'net_' + str(self._thread_index)
@@ -198,15 +202,15 @@ class A3CLSTMNetwork(A3CNetwork):
                 scope=scope
             )
             print lstm_outputs.get_shape()
-            lstm_outputs = tf.reshape(lstm_outputs, [-1, 512])
+            lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
 
             # fc2: (pi) for policy output
-            self.W_fc2 = weight_variable([512, action_dim])
+            self.W_fc2 = weight_variable([256, action_dim])
             self.b_fc2 = bias_variable([action_dim])
             self.policy_output = tf.nn.softmax(tf.matmul(lstm_outputs, self.W_fc2) + self.b_fc2)
 
             # fc3: (v)  for value output
-            self.W_fc3 = weight_variable([512, 1])
+            self.W_fc3 = weight_variable([256, 1])
             self.b_fc3 = bias_variable([1])
             v_ = tf.matmul(lstm_outputs, self.W_fc3) + self.b_fc3
             self.value_output = tf.reshape(v_, [-1])
@@ -222,7 +226,7 @@ class A3CLSTMNetwork(A3CNetwork):
         return [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
-            self.W_conv3, self.b_conv3,
+            # self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
             self.lstm.matrix, self.lstm.bias,
             self.W_fc2, self.b_fc2,
