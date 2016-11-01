@@ -150,7 +150,7 @@ class A3CActorThread(object):
                 self.local_network.action_input: batch_action,
                 self.local_network.td: batch_td,
                 self.local_network.R: batch_R,
-                self.local_network.step_size: [LOCAL_T_MAX],
+                self.local_network.step_size: [len(batch_state)],
                 self.local_network.initial_lstm_state: start_lstm_state
             })
         else:
