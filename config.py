@@ -7,7 +7,7 @@ LOCAL_T_MAX = 5  # repeat step size
 RMSP_ALPHA = 0.99  # decay parameter for RMSProp
 RMSP_EPSILON = 0.1  # epsilon parameter for RMSProp
 GAMMA = 0.99
-ENTROPY_BETA = 1e-6
+ENTROPY_BETA = 0.0
 MAX_TIME_STEP = 10 * 10**7
 
 INITIAL_ALPHA_LOW = 1e-4    # log_uniform low limit for learning rate

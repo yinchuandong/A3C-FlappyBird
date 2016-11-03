@@ -38,6 +38,7 @@ class A3CActorThread(object):
         self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
         # self.apply_gradients = optimizer.apply_gradients(
         #     zip(self.trainer.get_accum_grad_list(), global_network.get_vars()))
+
         self.sync = self.local_network.sync_from(global_network)
 
         self.game_state = GameState()
@@ -176,5 +177,3 @@ if __name__ == '__main__':
     game_state = GameState()
     game_state.process(1)
     print np.shape(game_state.s_t)
-
-

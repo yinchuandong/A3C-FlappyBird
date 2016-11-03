@@ -33,7 +33,8 @@ class A3C(object):
 
         self.initial_learning_rate = log_uniform(INITIAL_ALPHA_LOW, INITIAL_ALPHA_HIGH, INITIAL_ALPHA_LOG_RATE)
         self.learning_rate_input = tf.placeholder('float')
-        self.optimizer = tf.train.RMSPropOptimizer(self.learning_rate_input, RMSP_ALPHA, 0.0, 1e-10)
+        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate_input,
+                                                   decay=RMSP_ALPHA, momentum=0.0, epsilon=RMSP_EPSILON)
 
         self.actor_threads = []
         for i in range(PARALLEL_SIZE):
