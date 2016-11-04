@@ -33,7 +33,9 @@ class A3CNetwork(object):
         # R (input for value)
         self.R = tf.placeholder('float', [None])
         # value loss (output) L = (R-V)^2
-        value_loss = tf.reduce_mean(tf.square(self.R - self.value_output))
+        # value_loss = tf.reduce_mean(tf.square(self.R - self.value_output))
+        value_loss = 0.5 * tf.nn.l2_loss(self.R - self.value_output)
+
         self.total_loss = policy_loss + value_loss
         return
 
