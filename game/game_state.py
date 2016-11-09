@@ -17,6 +17,7 @@ SCREENHEIGHT = 512
 class GameState:
     def __init__(self):
         pygame.init()
+        
         self.FPSCLOCK = pygame.time.Clock()
         self.SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
         pygame.display.set_caption('Flappy Bird')
