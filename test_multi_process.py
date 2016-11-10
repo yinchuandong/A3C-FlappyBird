@@ -4,25 +4,31 @@ from multiprocessing import Process, Value, Array
 from threading import Thread
 from game.game_state import GameState
 
+stop_requested = False
+
 
 def train_function(index):
     print 'train==', index
     game = GameState()
-    # for i in range(1000):
-    #     game.process(0)
+    for i in range(1000):
+        if stop_requested:
+            break
+        game.process(0)
     return
 
 
 def signal_handler(signal_, frame_):
     print 'You pressed Ctrl+C !'
+    global stop_requested
+    stop_requested = True
     return
 
 
 def run():
     train_treads = []
-    for i in range(1):
-        # train_treads.append(Process(target=train_function, args=(i,)))
+    for i in range(2):
         train_treads.append(Process(target=train_function, args=(i,)))
+        # train_treads.append(Thread(target=train_function, args=(i,)))
 
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -42,7 +48,7 @@ def run():
 def flappy():
     game = GameState()
     # for i in range(100):
-        # game.process(0)
+    # game.process(0)
     return
 
 
