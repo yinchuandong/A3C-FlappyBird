@@ -1,3 +1,5 @@
 *.pyc
 *log*
 checkpoints*/*
+.DS_Store
+test*.png

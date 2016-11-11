@@ -1,6 +1,7 @@
 import SocketServer
 import numpy as np
 from PIL import Image
+import cPickle
 
 
 class MyUDPHandler(SocketServer.BaseRequestHandler):
@@ -19,8 +20,10 @@ class MyUDPHandler(SocketServer.BaseRequestHandler):
         # socket.sendto(data.upper(), self.client_address)
         image = Image.open('images/preprocess.png')
         image = image.resize((120, 120), Image.ANTIALIAS)
+        image.save('images/test.png')
         data = np.array(image)
-        socket.sendto(data, self.client_address)
+        bin_data = cPickle.dumps(data)
+        socket.sendto(bin_data, self.client_address)
 
 
 if __name__ == "__main__":

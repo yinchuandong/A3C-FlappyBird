@@ -1,6 +1,8 @@
 import socket
 import sys
 import numpy as np
+import cPickle
+
 
 HOST, PORT = "localhost", 9999
 data = " ".join(sys.argv[1:])
@@ -12,9 +14,9 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Instead, data is directly sent to the recipient via sendto().
 sock.sendto(data + "\n", (HOST, PORT))
 received = sock.recv(65535)
-with open('a.png', 'wb') as f:
-    f.write(received)
+data = cPickle.loads(received)
+
 
 print "Sent:     {}".format(data)
-# print "Received: {}".format(np.shape(received))
-print received
+print "Received: {}".format(np.shape(received))
+# print received
