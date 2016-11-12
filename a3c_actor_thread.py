@@ -41,8 +41,7 @@ class A3CActorThread(object):
 
         self.sync = self.local_network.sync_from(global_network)
 
-        self.game_state = GameState()
-        self.game_state.reset()
+        self.game_state = GameState(thread_index)
 
         self.local_t = 0
         self.initial_learning_rate = initial_learning_rate

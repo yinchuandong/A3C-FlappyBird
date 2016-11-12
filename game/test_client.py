@@ -10,9 +10,10 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
 def main():
-    data = " ".join(sys.argv[1:])
-
-    sock.sendto(data + "\n", (HOST, PORT))
+    # data = " ".join(sys.argv[1:])
+    # send action
+    sock.sendto(str(1), (HOST, PORT))
+    
     header = sock.recv(1000)
     header = cPickle.loads(header)
     print header
