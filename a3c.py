@@ -5,7 +5,6 @@ import tensorflow as tf
 import numpy as np
 import math
 import threading
-import multiprocessing
 import signal
 
 from a3c_network import A3CFFNetwork, A3CLSTMNetwork
@@ -90,8 +89,7 @@ class A3C(object):
     def run(self):
         train_treads = []
         for i in range(PARALLEL_SIZE):
-            # train_treads.append(threading.Thread(target=self.train_function, args=(i,)))
-            train_treads.append(multiprocessing.Process(target=self.train_function, args=(i,)))
+            train_treads.append(threading.Thread(target=self.train_function, args=(i,)))
 
         signal.signal(signal.SIGINT, self.signal_handler)
 

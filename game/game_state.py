@@ -6,7 +6,7 @@ import cPickle
 class GameState:
     def __init__(self, index=0, host='localhost', port=9600):
         self.host = host
-        self.port = port
+        self.port = port + index
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.reset()
         return
