@@ -76,7 +76,7 @@ class A3C(object):
                 break
             diff_global_t = actor_thread.process(self.sess, self.global_t)
             self.global_t += diff_global_t
-            if self.global_t % 10000 < LOCAL_T_MAX:
+            if self.global_t % 100000 < LOCAL_T_MAX:
                 self.backup()
             # print 'global_t:', self.global_t
         return
