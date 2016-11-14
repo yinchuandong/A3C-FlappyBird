@@ -1,11 +1,16 @@
 import tensorflow as tf
 import numpy as np
 import random
+import time
 
 from accum_trainer import AccumTrainer
 from a3c_network import A3CFFNetwork, A3CLSTMNetwork
 from config import *
 from game.game_state import GameState
+
+
+def timestamp():
+    return time.time()
 
 
 class A3CActorThread(object):
@@ -45,7 +50,10 @@ class A3CActorThread(object):
 
         self.local_t = 0
         self.initial_learning_rate = initial_learning_rate
+
+        # for log
         self.episode_reward = 0.0
+        self.episode_start_time = 0.0
         self.prev_local_t = 0
         return
 
@@ -69,13 +77,24 @@ class A3CActorThread(object):
                 return i
         return len(values) - 1
 
-    def process(self, sess, global_t):
+    def _record_log(self, sess, global_t, summary_writer, summary_op, reward_input, reward, time_input, living_time):
+        summary_str = sess.run(summary_op, feed_dict={
+            reward_input: reward,
+            time_input: living_time
+        })
+        summary_writer.add_summary(summary_str, global_t)
+        return
+
+    def process(self, sess, global_t, summary_writer, summary_op, reward_input, time_input):
         states = []
         actions = []
         rewards = []
         values = []
 
         terminal_end = False
+        # reduce the influence of socket connecting time
+        if self.episode_start_time == 0.0:
+            self.episode_start_time = timestamp()
 
         sess.run(self.reset_gradients)
         # copy weight from global network
@@ -87,8 +106,10 @@ class A3CActorThread(object):
 
         for i in range(LOCAL_T_MAX):
             policy_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
-            # print 'policy=', policy_
-            # print 'value=', value_
+            if self.thread_index == 0 and self.local_t % 1000 == 0:
+                print 'policy=', policy_
+                print 'value=', value_
+
             actionId = self.choose_action(policy_)
 
             states.append(self.game_state.s_t)
@@ -109,7 +130,17 @@ class A3CActorThread(object):
 
             if terminal:
                 terminal_end = True
+                episode_end_time = timestamp()
+                living_time = episode_end_time - self.episode_start_time
+
+                self._record_log(sess, global_t, summary_writer, summary_op,
+                                 reward_input, self.episode_reward, time_input, living_time)
+
+                print ("global_t=%d / reward=%.2f / living_time=%.4f") % (global_t, self.episode_reward, living_time)
+
+                # reset variables
                 self.episode_reward = 0.0
+                self.episode_start_time = episode_end_time
                 self.game_state.reset()
                 if USE_LSTM:
                     self.local_network.reset_lstm_state()
@@ -119,7 +150,7 @@ class A3CActorThread(object):
         R = 0.0
         if not terminal_end:
             R = self.local_network.run_value(sess, self.game_state.s_t)
-        print ('global_t: %d, R: %f') % (global_t, R)
+        # print ('global_t: %d, R: %f') % (global_t, R)
 
         states.reverse()
         actions.reverse()
@@ -173,6 +204,8 @@ class A3CActorThread(object):
 
 
 if __name__ == '__main__':
-    game_state = GameState()
-    game_state.process(1)
-    print np.shape(game_state.s_t)
+    # game_state = GameState()
+    # game_state.process(1)
+    # print np.shape(game_state.s_t)
+    print timestamp()
+    print time.time()
