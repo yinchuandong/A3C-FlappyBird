@@ -1,7 +1,6 @@
 *.pyc
 *log*
 checkpoints*/*
-tmp
-*.DS_Store
-
-
+.DS_Store
+test*.png
+tmp*/*
