@@ -45,6 +45,15 @@ class A3C(object):
         self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True))
         self.sess.run(tf.initialize_all_variables())
 
+        self.reward_input = tf.placeholder(tf.float32)
+        tf.scalar_summary('reward', self.reward_input)
+
+        self.time_input = tf.placeholder(tf.float32)
+        tf.scalar_summary('living_time', self.time_input)
+
+        self.summary_op = tf.merge_all_summaries()
+        self.summary_writer = tf.train.SummaryWriter(LOG_FILE, self.sess.graph)
+
         self.saver = tf.train.Saver()
         self.restore()
         return
@@ -74,9 +83,13 @@ class A3C(object):
         while True:
             if self.stop_requested or (self.global_t > MAX_TIME_STEP):
                 break
-            diff_global_t = actor_thread.process(self.sess, self.global_t)
+            diff_global_t = actor_thread.process(
+                self.sess, self.global_t,
+                self.summary_writer, self.summary_op,
+                self.reward_input, self.time_input
+            )
             self.global_t += diff_global_t
-            if self.global_t % 100000 < LOCAL_T_MAX:
+            if self.global_t % 1000000 < LOCAL_T_MAX:
                 self.backup()
             # print 'global_t:', self.global_t
         return
