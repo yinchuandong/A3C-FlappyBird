@@ -1,3 +1,7 @@
 *.pyc
 *log*
 checkpoints*/*
+tmp
+*.DS_Store
+
+
