@@ -145,6 +145,11 @@ class A3CActorThread(object):
                 if USE_LSTM:
                     self.local_network.reset_lstm_state()
                 break
+            # log
+            if self.local_t % 2000 == 0:
+                living_time = timestamp() - self.episode_start_time
+                self._record_log(sess, global_t, summary_writer, summary_op,
+                                 reward_input, self.episode_reward, time_input, living_time)
         # -----------end of batch (LOCAL_T_MAX)--------------------
 
         R = 0.0
