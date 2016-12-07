@@ -110,13 +110,13 @@ class A3CActorThread(object):
                 print 'policy=', policy_
                 print 'value=', value_
 
-            actionId = self.choose_action(policy_)
+            action_id = self.choose_action(policy_)
 
             states.append(self.game_state.s_t)
-            actions.append(actionId)
+            actions.append(action_id)
             values.append(value_)
 
-            self.game_state.process(actionId)
+            self.game_state.process(action_id)
             reward = self.game_state.reward
             terminal = self.game_state.terminal
 
