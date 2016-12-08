@@ -56,6 +56,8 @@ class A3C(object):
 
         self.saver = tf.train.Saver()
         self.restore()
+
+        self.lock = threading.Lock()
         return
 
     def restore(self):
@@ -78,7 +80,7 @@ class A3C(object):
         self.saver.save(self.sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step=self.global_t)
         return
 
-    def train_function(self, parallel_index):
+    def train_function(self, parallel_index, lock):
         actor_thread = self.actor_threads[parallel_index]
         while True:
             if self.stop_requested or (self.global_t > MAX_TIME_STEP):
@@ -88,6 +90,12 @@ class A3C(object):
                 self.summary_writer, self.summary_op,
                 self.reward_input, self.time_input
             )
+
+            # need to lock only when updating global gradients
+            lock.acquire()
+            actor_thread.update_global_gradient(global_t)
+            lock.release()
+
             self.global_t += diff_global_t
             if self.global_t % 1000000 < LOCAL_T_MAX:
                 self.backup()
@@ -102,7 +110,7 @@ class A3C(object):
     def run(self):
         train_treads = []
         for i in range(PARALLEL_SIZE):
-            train_treads.append(threading.Thread(target=self.train_function, args=(i,)))
+            train_treads.append(threading.Thread(target=self.train_function, args=(i, self.lock)))
 
         signal.signal(signal.SIGINT, self.signal_handler)
 
