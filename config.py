@@ -3,7 +3,7 @@ STATE_DIM = 84
 STATE_CHN = 4
 ACTION_DIM = 2
 
-LOCAL_T_MAX = 5  # repeat step size
+LOCAL_T_MAX = 32  # repeat step size
 RMSP_ALPHA = 0.99  # decay parameter for RMSProp
 RMSP_EPSILON = 1e-10  # epsilon parameter for RMSProp
 GAMMA = 0.99
