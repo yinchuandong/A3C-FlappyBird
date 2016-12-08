@@ -93,7 +93,7 @@ class A3C(object):
 
             # need to lock only when updating global gradients
             lock.acquire()
-            actor_thread.update_global_gradient(self.global_t)
+            actor_thread.update_global_gradient(self.sess, self.global_t)
             lock.release()
 
             self.global_t += diff_global_t

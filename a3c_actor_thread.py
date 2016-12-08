@@ -202,7 +202,7 @@ class A3CActorThread(object):
         diff_local_t = self.local_t - start_local_t
         return diff_local_t
 
-    def update_global_gradient(self, global_t):
+    def update_global_gradient(self, sess, global_t):
         '''
         update the gradient of global, need to add thread lock in case of conc
         '''
