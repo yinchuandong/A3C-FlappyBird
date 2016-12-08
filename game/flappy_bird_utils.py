@@ -11,8 +11,8 @@ def load():
     )
 
     # path of background
-    # BACKGROUND_PATH = 'assets/sprites/background-black.png'
-    BACKGROUND_PATH = 'assets/sprites/background-day.png'
+    BACKGROUND_PATH = 'assets/sprites/background-black.png'
+    # BACKGROUND_PATH = 'assets/sprites/background-day.png'
 
     # path of pipe
     PIPE_PATH = 'assets/sprites/pipe-green.png'

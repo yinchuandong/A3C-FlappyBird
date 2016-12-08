@@ -16,7 +16,7 @@ INITIAL_ALPHA_LOG_RATE = 0.4226  # log_uniform interpolate rate for learning rat
 
 PARALLEL_SIZE = 4  # parallel thread size, please start game_server first
 USE_GPU = True
-USE_LSTM = True
+USE_LSTM = False
 
 CHECKPOINT_DIR = 'tmp/checkpoints'
 LOG_FILE = 'tmp/a3c_log'
