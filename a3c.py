@@ -132,3 +132,4 @@ if __name__ == '__main__':
     print 'a3c.py'
     net = A3C()
     net.run()
+    # print log_uniform(1e-4, 1e-2, 0.4226)    
