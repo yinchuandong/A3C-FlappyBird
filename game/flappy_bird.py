@@ -148,7 +148,8 @@ class FlappyBird:
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
         image_data = Image.fromarray(image_data).convert('L')
         image_data = image_data.resize((84, 84), Image.ANTIALIAS)
-        
+        # image_data.save('tmp.png')
+
         pygame.display.update()
         self.FPSCLOCK.tick(FPS)
         # print self.upperPipes[0]['y'] + self.PIPE_HEIGHT - int(self.BASEY *
@@ -160,6 +161,7 @@ class FlappyBird:
         action[0] = 1
         x_t, reward, terminal = self.frame_step(action)
         self.s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
+        # self.s_t = self.s_t / 255.0
         self.reward = reward
         self.terminal = terminal
         return
@@ -169,6 +171,7 @@ class FlappyBird:
         action[actionId] = 1
         x_t1, reward, terminal = self.frame_step(action)
         x_t1 = np.reshape(x_t1, (84, 84, 1))
+        # x_t1 = x_t1 / 255.0
         self.s_t1 = np.append(self.s_t[:, :, 1:], x_t1, axis=2)
         self.reward = reward
         self.terminal = terminal
