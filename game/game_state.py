@@ -34,7 +34,7 @@ class GameState:
         action = np.zeros([2])
         action[0] = 1
         x_t, reward, terminal = self.frame_step(action)
-        self.s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
+        self.s_t = np.stack((x_t, x_t, x_t, x_t, x_t, x_t), axis=2)
         self.reward = reward
         self.terminal = terminal
         return
