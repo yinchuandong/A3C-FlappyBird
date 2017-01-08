@@ -10,6 +10,8 @@ INPUT_SIZE = 84
 INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
+LSTM_UNITS = 256
+
 GAMMA = 0.99
 FINAL_EPSILON = 0.01
 INITIAL_EPSILON = 1.0
@@ -76,9 +78,24 @@ class DQN(object):
         print h_conv3_out_size
         h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size], name='h_conv3_flat')
 
-        W_fc1 = weight_variable([h_conv3_out_size, 512], name='W_fc1')
-        b_fc1 = bias_variable([512], name='b_fc1')
+        W_fc1 = weight_variable([h_conv3_out_size, 256])
+        b_fc1 = bias_variable([256])
         h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
+
+        # reshape to fit lstm (1, 5, 256)
+        h_fc1_reshaped = tf.reshape(h_fc1, [BATCH_SIZE, -1, 256])
+
+        self.lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
+        self.lstm_initial_state = self.lstm_cell.zero_state(BATCH_SIZE)
+        self.timestep = tf.placeholder(dtype=tf.int32)
+        lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
+            self.lstm_cell,
+            h_fc1_reshaped,
+            initial_state=self.initial_lstm_state,
+            sequence_length=self.timestep,
+            time_major=False,
+            scope=scope
+        )
 
         # readout layer: Q_value
         W_fc2 = weight_variable([512, ACTIONS_DIM], name='W_fc2')
