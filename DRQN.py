@@ -3,7 +3,7 @@ import numpy as np
 import random
 import time
 from netutil import *
-from game.game_state import GameState
+from game.flappy_bird import FlappyBird
 from replay_buffer import ReplayBuffer
 
 INPUT_SIZE = 84
@@ -11,9 +11,10 @@ INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
 LSTM_UNITS = 256
+LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
-FINAL_EPSILON = 0.01
+FINAL_EPSILON = 0.0001
 INITIAL_EPSILON = 1.0
 
 ALPHA = 1e-6  # the learning rate of optimizer
@@ -23,11 +24,11 @@ EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 REPLAY_MEMORY = 50000
 BATCH_SIZE = 32
 
-CHECKPOINT_DIR = 'tmp-dqn/checkpoints'
-LOG_FILE = 'tmp-dqn/log'
+CHECKPOINT_DIR = 'tmp-drqn/checkpoints'
+LOG_FILE = 'tmp-drqn/log'
 
 
-class DQN(object):
+class DRQN(object):
 
     def __init__(self):
         self.global_t = 0
@@ -40,9 +41,9 @@ class DQN(object):
 
         # init session
         self.session = tf.InteractiveSession()
-        self.session.run(tf.initialize_all_variables())
+        self.session.run(tf.global_variables_initializer())
 
-        self.saver = tf.train.Saver(tf.all_variables())
+        self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
 
         # for recording the log into tensorboard
@@ -51,7 +52,7 @@ class DQN(object):
         tf.scalar_summary('living_time', self.time_input)
         tf.scalar_summary('reward', self.reward_input)
         self.summary_op = tf.merge_all_summaries()
-        self.summary_writer = tf.train.SummaryWriter(LOG_FILE, self.sess.graph)
+        self.summary_writer = tf.train.SummaryWriter(LOG_FILE, self.session.graph)
 
         self.episode_start_time = 0.0
         self.episode_reward = 0.0
@@ -62,21 +63,21 @@ class DQN(object):
         s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
 
         # hidden conv layer
-        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32], name='W_conv1')
-        b_conv1 = bias_variable([32], name='b_conv1')
+        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32])
+        b_conv1 = bias_variable([32])
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
 
-        W_conv2 = weight_variable([4, 4, 32, 64], name='W_conv2')
-        b_conv2 = bias_variable([64], name='b_conv2')
+        W_conv2 = weight_variable([4, 4, 32, 64])
+        b_conv2 = bias_variable([64])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
 
-        W_conv3 = weight_variable([3, 3, 64, 64], name='W_conv3')
-        b_conv3 = bias_variable([64], name='b_conv3')
+        W_conv3 = weight_variable([3, 3, 64, 64])
+        b_conv3 = bias_variable([64])
         h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
 
         h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
         print h_conv3_out_size
-        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size], name='h_conv3_flat')
+        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
 
         W_fc1 = weight_variable([h_conv3_out_size, 256])
         b_fc1 = bias_variable([256])
@@ -86,7 +87,7 @@ class DQN(object):
         h_fc1_reshaped = tf.reshape(h_fc1, [BATCH_SIZE, -1, 256])
 
         self.lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
-        self.lstm_initial_state = self.lstm_cell.zero_state(BATCH_SIZE)
+        self.initial_lstm_state = self.lstm_cell.zero_state(BATCH_SIZE, tf.float32)
         self.timestep = tf.placeholder(dtype=tf.int32)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
             self.lstm_cell,
@@ -94,13 +95,16 @@ class DQN(object):
             initial_state=self.initial_lstm_state,
             sequence_length=self.timestep,
             time_major=False,
-            scope=scope
+            dtype=tf.float32,
+            scope='drqn'
         )
+        print lstm_outputs.get_shape()
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
 
         # readout layer: Q_value
-        W_fc2 = weight_variable([512, ACTIONS_DIM], name='W_fc2')
-        b_fc2 = bias_variable([ACTIONS_DIM], name='b_fc2')
-        Q_value = tf.matmul(h_fc1, W_fc2) + b_fc2
+        W_fc2 = weight_variable([256, ACTIONS_DIM])
+        b_fc2 = bias_variable([ACTIONS_DIM])
+        Q_value = tf.matmul(lstm_outputs, W_fc2) + b_fc2
 
         self.s = s
         self.Q_value = Q_value
@@ -117,8 +121,6 @@ class DQN(object):
 
     def perceive(self, state, action, reward, next_state, terminal):
         self.global_t += 1
-
-        self.replay_buffer.append((state, action, reward, next_state, terminal))
 
         self.episode_reward += reward
         if self.episode_start_time == 0.0:
@@ -137,14 +139,14 @@ class DQN(object):
         return
 
     def get_action_index(self, state):
-        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: state})[0]
+        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state]})[0]
         return np.argmax(Q_value_t), np.max(Q_value_t)
 
     def epsilon_greedy(self, state):
         """
         :param state: 1x84x84x3
         """
-        Q_value_t = self.Q_value.eval(session=self.session, feed_dict={self.s: state})[0]
+        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state]})[0]
         action_index = 0
         if random.random() <= self.epsilon:
             action_index = random.randrange(ACTIONS_DIM)
@@ -200,7 +202,7 @@ class DQN(object):
     def restore(self):
         checkpoint = tf.train.get_checkpoint_state(CHECKPOINT_DIR)
         if checkpoint and checkpoint.model_checkpoint_path:
-            self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
+            self.saver.restore(self.session, checkpoint.model_checkpoint_path)
             print("checkpoint loaded:", checkpoint.model_checkpoint_path)
             tokens = checkpoint.model_checkpoint_path.split("-")
             # set global step
@@ -214,32 +216,45 @@ class DQN(object):
         if not os.path.exists(CHECKPOINT_DIR):
             os.mkdir(CHECKPOINT_DIR)
 
-        self.saver.save(self.sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step=self.global_t)
+        self.saver.save(self.session, CHECKPOINT_DIR + '/' + 'checkpoint', global_step=self.global_t)
         return
 
 
-def run_doom():
+def main():
     '''
     the function for training
     '''
-    agent = DQN()
-    game = GameState()
-    game.reset()
+    agent = DRQN()
+    env = FlappyBird()
 
-    while agent.global_t < MAX_TIME_STEP:
-        action_id = agent.epsilon_greedy(game.s_t)
-        game.process(action_id)
-        action = np.zeros(ACTIONS_DIM)
-        action[action_id] = 1
-        agent.perceive(game.s_t, action, game.reward, game.s_t1, game.terminal)
+    while True:
+        episode_buffer = []
+        while not env.terminal:
+            # action_id = random.randint(0, 1)
+            action_id = agent.epsilon_greedy(env.s_t)
+            env.process(action_id)
 
-        if game.terminal:
-            game.reset()
-        # s_t <- s_t1
-        game.update()
+            action = np.zeros(ACTIONS_DIM)
+            action[action_id] = 1
+            state = env.s_t
+            next_state = env.s_t1
+            reward = env.reward
+            terminal = env.terminal
+            episode_buffer.append((state, action, reward, next_state, terminal))
 
+            agent.perceive(state, action, reward, next_state, terminal)
+
+            env.update()
+            if len(episode_buffer) > 100:
+                # start a new episode buffer, in case of an over-long memory
+                break
+
+        if len(episode_buffer) > MAX_TIME_STEP:
+            drqn.replay_buffer.add(episode_buffer)
+        print len(episode_buffer)
+        break
     return
 
 
 if __name__ == '__main__':
-    run_doom()
+    main()

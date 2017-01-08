@@ -21,3 +21,16 @@ def max_pool_2x2(x):
 
 def output_size(in_size, filter_size, stride):
     return (in_size - filter_size) / stride + 1
+
+
+def lstm_last_relevant(output, length):
+    '''
+    get the last relevant frame of the output of tf.nn.dynamica_rnn()
+    '''
+    batch_size = tf.shape(output)[0]
+    max_length = int(output.get_shape()[1])
+    output_size = int(output.get_shape()[2])
+    index = tf.range(0, batch_size) * max_length + (length - 1)
+    flat = tf.reshape(output, [-1, output_size])
+    relevant = tf.gather(flat, index)
+    return relevant
