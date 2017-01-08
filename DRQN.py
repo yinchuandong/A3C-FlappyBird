@@ -79,16 +79,17 @@ class DRQN(object):
         print h_conv3_out_size
         h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
 
-        W_fc1 = weight_variable([h_conv3_out_size, 256])
-        b_fc1 = bias_variable([256])
+        W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
+        b_fc1 = bias_variable([LSTM_UNITS])
         h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
 
-        # reshape to fit lstm (1, 5, 256)
-        h_fc1_reshaped = tf.reshape(h_fc1, [BATCH_SIZE, -1, 256])
-
-        self.lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
-        self.initial_lstm_state = self.lstm_cell.zero_state(BATCH_SIZE, tf.float32)
+        # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
         self.timestep = tf.placeholder(dtype=tf.int32)
+        self.batch_size = tf.placeholder(dtype=tf.int32)
+
+        h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, -1, LSTM_UNITS])
+        self.lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
+        self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
             self.lstm_cell,
             h_fc1_reshaped,
@@ -99,10 +100,10 @@ class DRQN(object):
             scope='drqn'
         )
         print lstm_outputs.get_shape()
-        lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
 
         # readout layer: Q_value
-        W_fc2 = weight_variable([256, ACTIONS_DIM])
+        W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
         b_fc2 = bias_variable([ACTIONS_DIM])
         Q_value = tf.matmul(lstm_outputs, W_fc2) + b_fc2
 
@@ -134,27 +135,33 @@ class DRQN(object):
             self.episode_reward = 0.0
             self.episode_start_time = time.time()
 
-        if len(self.replay_buffer) > REPLAY_MEMORY:
+        # if self.replay_buffer.size() > BATCH_SIZE * 2:
+        if self.replay_buffer.size() > 2:
             self.train_Q_network()
         return
 
-    def get_action_index(self, state):
-        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state]})[0]
+    def get_action_index(self, state, lstm_state):
+        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state], self.initial_lstm_state: lstm_state})[0]
         return np.argmax(Q_value_t), np.max(Q_value_t)
 
-    def epsilon_greedy(self, state):
+    def epsilon_greedy(self, state, lstm_state):
         """
         :param state: 1x84x84x3
         """
-        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state]})[0]
+        Q_value_t = self.session.run(
+            self.Q_value,
+            feed_dict={
+                self.s: [state], self.initial_lstm_state: lstm_state,
+                self.batch_size: 1, self.timestep: 1
+            })[0]
         action_index = 0
         if random.random() <= self.epsilon:
             action_index = random.randrange(ACTIONS_DIM)
         else:
             action_index = np.argmax(Q_value_t)
 
-        if self.epsilon > FINAL_EPSILON and self.global_t > OBSERVE:
-            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / OBSERVE
+        if self.epsilon > FINAL_EPSILON and self.global_t < EPSILON_TIME_STEP:
+            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
         max_q_value = np.max(Q_value_t)
         return action_index, max_q_value
 
@@ -162,7 +169,8 @@ class DRQN(object):
         '''
         do backpropogation
         '''
-        minibatch = random.sample(self.replay_buffer, BATCH_SIZE)
+        minibatch = self.replay_buffer.sample(BATCH_SIZE, LSTM_MAX_STEP)
+        # todo: the batch sampled from buffer is batch_size * timestep, need to redefine loss function
         state_batch = [t[0] for t in minibatch]
         action_batch = [t[1] for t in minibatch]
         reward_batch = [t[2] for t in minibatch]
@@ -170,6 +178,7 @@ class DRQN(object):
         terminal_batch = [t[4] for t in minibatch]
 
         y_batch = []
+        # todo: need to feed with batch_size, timestep, lstm_state
         Q_value_batch = self.session.run(Q_value, feed_dict={self.s: next_state_batch})
         for i in range(BATCH_SIZE):
             terminal = terminal_batch[i]
@@ -229,9 +238,10 @@ def main():
 
     while True:
         episode_buffer = []
+        lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id = agent.epsilon_greedy(env.s_t)
+            action_id, action_q = agent.epsilon_greedy(env.s_t, lstm_state)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
@@ -245,14 +255,16 @@ def main():
             agent.perceive(state, action, reward, next_state, terminal)
 
             env.update()
+            if env.terminal:
+                env.reset()
             if len(episode_buffer) > 100:
                 # start a new episode buffer, in case of an over-long memory
                 break
 
-        if len(episode_buffer) > MAX_TIME_STEP:
-            drqn.replay_buffer.add(episode_buffer)
+        if len(episode_buffer) > LSTM_MAX_STEP:
+            agent.replay_buffer.add(episode_buffer)
         print len(episode_buffer)
-        break
+        # break
     return
 
 
