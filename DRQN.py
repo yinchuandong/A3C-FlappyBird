@@ -22,7 +22,7 @@ ALPHA = 1e-6  # the learning rate of optimizer
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 REPLAY_MEMORY = 50000
-BATCH_SIZE = 32
+BATCH_SIZE = 2
 
 CHECKPOINT_DIR = 'tmp-drqn/checkpoints'
 LOG_FILE = 'tmp-drqn/log'
@@ -136,7 +136,7 @@ class DRQN(object):
             self.episode_start_time = time.time()
 
         # if self.replay_buffer.size() > BATCH_SIZE * 2:
-        if self.replay_buffer.size() > 2:
+        if self.replay_buffer.size() > 1:
             self.train_Q_network()
         return
 
@@ -169,8 +169,8 @@ class DRQN(object):
         '''
         do backpropogation
         '''
+        # len(minibatch) = BATCH_SIZE * LSTM_MAX_STEP
         minibatch = self.replay_buffer.sample(BATCH_SIZE, LSTM_MAX_STEP)
-        # todo: the batch sampled from buffer is batch_size * timestep, need to redefine loss function
         state_batch = [t[0] for t in minibatch]
         action_batch = [t[1] for t in minibatch]
         reward_batch = [t[2] for t in minibatch]
@@ -179,8 +179,17 @@ class DRQN(object):
 
         y_batch = []
         # todo: need to feed with batch_size, timestep, lstm_state
-        Q_value_batch = self.session.run(Q_value, feed_dict={self.s: next_state_batch})
-        for i in range(BATCH_SIZE):
+        lstm_state = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
+        Q_value_batch = self.session.run(
+            self.Q_value,
+            feed_dict={
+                self.s: next_state_batch,
+                self.initial_lstm_state: lstm_state,
+                self.batch_size: BATCH_SIZE,
+                self.timestep: LSTM_MAX_STEP
+            }
+        )
+        for i in range(len(state_batch)):
             terminal = terminal_batch[i]
             if terminal:
                 y_batch.append(reward_batch[i])
@@ -190,7 +199,10 @@ class DRQN(object):
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
             self.a: action_batch,
-            self.s: state_batch
+            self.s: state_batch,
+            self.initial_lstm_state: lstm_state,
+            self.batch_size: BATCH_SIZE,
+            self.timestep: LSTM_MAX_STEP
         })
 
         if self.global_t % 100000 == 0:

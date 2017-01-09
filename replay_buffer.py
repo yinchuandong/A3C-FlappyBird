@@ -18,9 +18,8 @@ class ReplayBuffer(object):
         experience = []
         for episode in episode_batch:
             start = random.randint(0, len(episode) - timestep)
-            experience.append(episode[start:start + timestep])
-        experience = np.array(experience)
-        return np.reshape(experience, [batch_size * timestep])
+            experience += episode[start:start + timestep]
+        return experience
 
     def capacity(self):
         return self.capacity
