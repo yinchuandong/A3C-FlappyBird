@@ -22,7 +22,7 @@ ALPHA = 1e-6  # the learning rate of optimizer
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 REPLAY_MEMORY = 50000
-BATCH_SIZE = 2
+BATCH_SIZE = 5
 
 CHECKPOINT_DIR = 'tmp-drqn/checkpoints'
 LOG_FILE = 'tmp-drqn/log'
@@ -127,7 +127,7 @@ class DRQN(object):
         if self.episode_start_time == 0.0:
             self.episode_start_time = time.time()
 
-        if terminal or self.global_t % 600 == 0:
+        if terminal or self.global_t % 100 == 0:
             living_time = time.time() - self.episode_start_time
             self.record_log(self.episode_reward, living_time)
 
@@ -135,9 +135,11 @@ class DRQN(object):
             self.episode_reward = 0.0
             self.episode_start_time = time.time()
 
-        # if self.replay_buffer.size() > BATCH_SIZE * 2:
-        if self.replay_buffer.size() > 1:
+        if self.replay_buffer.size() > BATCH_SIZE:
             self.train_Q_network()
+
+        if self.global_t % 100000 == 0:
+            self.backup()
         return
 
     def get_action_index(self, state, lstm_state):
@@ -205,8 +207,6 @@ class DRQN(object):
             self.timestep: LSTM_MAX_STEP
         })
 
-        if self.global_t % 100000 == 0:
-            self.backup()
         return
 
     def record_log(self, reward, living_time):
@@ -265,17 +265,19 @@ def main():
             episode_buffer.append((state, action, reward, next_state, terminal))
 
             agent.perceive(state, action, reward, next_state, terminal)
+            print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q
 
             env.update()
             if env.terminal:
                 env.reset()
-            if len(episode_buffer) > 100:
+            if len(episode_buffer) >= 100:
                 # start a new episode buffer, in case of an over-long memory
                 break
 
         if len(episode_buffer) > LSTM_MAX_STEP:
             agent.replay_buffer.add(episode_buffer)
-        print len(episode_buffer)
+        # print len(episode_buffer)
+        print 'replay_buffer.size:', agent.replay_buffer.size()
         # break
     return
 
