@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import random
 import time
+import os
+import sys
 from netutil import *
 from game.flappy_bird import FlappyBird
 from replay_buffer import ReplayBuffer
@@ -11,18 +13,18 @@ INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
 LSTM_UNITS = 256
-LSTM_MAX_STEP = 8
+LSTM_MAX_STEP = 5
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
 INITIAL_EPSILON = 1.0
 
-ALPHA = 1e-6  # the learning rate of optimizer
+ALPHA = 1e-5  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 REPLAY_MEMORY = 50000
-BATCH_SIZE = 5
+BATCH_SIZE = 2
 
 CHECKPOINT_DIR = 'tmp-drqn/checkpoints'
 LOG_FILE = 'tmp-drqn/log'
