@@ -3,4 +3,4 @@
 checkpoints*/*
 .DS_Store
 test*.png
-tmp*/*
+tmp*

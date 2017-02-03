@@ -5,7 +5,7 @@ import cPickle
 import time
 
 
-HOST, PORT = "localhost", 9999
+HOST, PORT = "localhost", 9600
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 

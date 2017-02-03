@@ -39,7 +39,7 @@ class A3CActorThread(object):
         self.accum_gradients = self.trainer.accumulate_gradients()
         self.reset_gradients = self.trainer.reset_gradients()
 
-        clip_accum_grads = [tf.clip_by_norm(accum_grad, 40.0) for accum_grad in self.trainer.get_accum_grad_list()]
+        clip_accum_grads = [tf.clip_by_norm(accum_grad, 10.0) for accum_grad in self.trainer.get_accum_grad_list()]
         self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
         # self.apply_gradients = optimizer.apply_gradients(
         #     zip(self.trainer.get_accum_grad_list(), global_network.get_vars()))
