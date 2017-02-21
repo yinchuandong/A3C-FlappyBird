@@ -9,7 +9,7 @@ from game.flappy_bird import FlappyBird
 from replay_buffer import ReplayBuffer
 
 INPUT_SIZE = 84
-INPUT_CHANNEL = 4
+INPUT_CHANNEL = 1
 ACTIONS_DIM = 2
 
 LSTM_UNITS = 256
@@ -255,13 +255,13 @@ def main():
         lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id, action_q = agent.epsilon_greedy(env.s_t, lstm_state)
+            action_id, action_q = agent.epsilon_greedy(np.reshape(env.s_t[:, :, -1], (84, 84, 1)), lstm_state)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
             action[action_id] = 1
-            state = env.s_t
-            next_state = env.s_t1
+            state = np.reshape(env.s_t[:, :, -1], (84, 84, 1))
+            next_state = np.reshape(env.s_t1[:, :, -1], (84, 84, 1))
             reward = env.reward
             terminal = env.terminal
             episode_buffer.append((state, action, reward, next_state, terminal))
