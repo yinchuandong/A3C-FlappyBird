@@ -26,8 +26,8 @@ EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 REPLAY_MEMORY = 50000
 BATCH_SIZE = 2
 
-CHECKPOINT_DIR = 'tmp-drqn/checkpoints'
-LOG_FILE = 'tmp-drqn/log'
+CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
+LOG_FILE = 'tmp_drqn/log'
 
 
 class DRQN(object):
