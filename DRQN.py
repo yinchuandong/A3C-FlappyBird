@@ -51,10 +51,10 @@ class DRQN(object):
         # for recording the log into tensorboard
         self.time_input = tf.placeholder(tf.float32)
         self.reward_input = tf.placeholder(tf.float32)
-        tf.scalar_summary('living_time', self.time_input)
-        tf.scalar_summary('reward', self.reward_input)
-        self.summary_op = tf.merge_all_summaries()
-        self.summary_writer = tf.train.SummaryWriter(LOG_FILE, self.session.graph)
+        tf.summary.scalar('living_time', self.time_input)
+        tf.summary.scalar('reward', self.reward_input)
+        self.summary_op = tf.summary.merge_all()
+        self.summary_writer = tf.summary.FileWriter(LOG_FILE, self.session.graph)
 
         self.episode_start_time = 0.0
         self.episode_reward = 0.0
@@ -90,7 +90,7 @@ class DRQN(object):
         self.batch_size = tf.placeholder(dtype=tf.int32)
 
         h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, -1, LSTM_UNITS])
-        self.lstm_cell = tf.nn.rnn_cell.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
+        self.lstm_cell = tf.contrib.rnn.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
         self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
             self.lstm_cell,
@@ -116,7 +116,7 @@ class DRQN(object):
     def create_minimize(self):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM], name='a')
         self.y = tf.placeholder('float', shape=[None], name='y')
-        Q_action = tf.reduce_sum(tf.mul(self.Q_value, self.a), reduction_indices=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.Q_value, self.a), reduction_indices=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         self.optimizer = tf.train.AdamOptimizer(ALPHA)
         self.apply_gradients = self.optimizer.minimize(self.loss)
@@ -129,7 +129,7 @@ class DRQN(object):
         if self.episode_start_time == 0.0:
             self.episode_start_time = time.time()
 
-        if terminal or self.global_t % 100 == 0:
+        if terminal or self.global_t % 10 == 0:
             living_time = time.time() - self.episode_start_time
             self.record_log(self.episode_reward, living_time)
 
