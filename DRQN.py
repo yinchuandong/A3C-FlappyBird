@@ -270,15 +270,16 @@ def main():
             print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q
 
             env.update()
-            if env.terminal:
-                env.reset()
             if len(episode_buffer) >= 100:
                 # start a new episode buffer, in case of an over-long memory
-                break
-
+                agent.replay_buffer.add(episode_buffer)
+                episode_buffer = []
+                print '----------- episode buffer > 100---------'
+        # reset the state
+        env.reset()
         if len(episode_buffer) > LSTM_MAX_STEP:
             agent.replay_buffer.add(episode_buffer)
-        # print len(episode_buffer)
+        print 'episode_buffer', len(episode_buffer)
         print 'replay_buffer.size:', agent.replay_buffer.size()
         # break
     return
