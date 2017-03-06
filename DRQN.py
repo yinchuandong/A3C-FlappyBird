@@ -66,11 +66,11 @@ class DRQN(object):
 
         # hidden conv layer
         W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
-        b_conv1 = bias_variable([32])
+        b_conv1 = bias_variable([16])
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
 
         W_conv2 = weight_variable([4, 4, 16, 32])
-        b_conv2 = bias_variable([64])
+        b_conv2 = bias_variable([32])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
 
         # W_conv3 = weight_variable([3, 3, 64, 64])
