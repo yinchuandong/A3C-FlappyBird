@@ -208,7 +208,7 @@ class DRQN(object):
             self.y: y_batch,
             self.a: action_batch,
             self.s: state_batch,
-            self.initial_lstm_state: lstm_state,
+            self.initial_lstm_state: lstm_state_train,
             self.batch_size: BATCH_SIZE,
             self.timestep: LSTM_MAX_STEP
         })
