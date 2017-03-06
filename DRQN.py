@@ -65,25 +65,25 @@ class DRQN(object):
         s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
 
         # hidden conv layer
-        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32])
+        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
         b_conv1 = bias_variable([32])
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
 
-        W_conv2 = weight_variable([4, 4, 32, 64])
+        W_conv2 = weight_variable([4, 4, 16, 32])
         b_conv2 = bias_variable([64])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
 
-        W_conv3 = weight_variable([3, 3, 64, 64])
-        b_conv3 = bias_variable([64])
-        h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
+        # W_conv3 = weight_variable([3, 3, 64, 64])
+        # b_conv3 = bias_variable([64])
+        # h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
 
-        h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-        print h_conv3_out_size
-        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+        h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
+        print h_conv2_out_size
+        h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
 
-        W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
+        W_fc1 = weight_variable([h_conv2_out_size, LSTM_UNITS])
         b_fc1 = bias_variable([LSTM_UNITS])
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
 
         # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
         self.timestep = tf.placeholder(dtype=tf.int32)
@@ -145,19 +145,23 @@ class DRQN(object):
         return
 
     def get_action_index(self, state, lstm_state):
-        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state], self.initial_lstm_state: lstm_state})[0]
-        return np.argmax(Q_value_t), np.max(Q_value_t)
+        Q_value_t, lstm_state_out = self.session.run(
+            [self.Q_value, self.lstm_state],
+            feed_dict={self.s: [state], self.initial_lstm_state: lstm_state}
+        )
+        return np.argmax(Q_value_t[0]), np.max(Q_value_t[0]), lstm_state_out
 
     def epsilon_greedy(self, state, lstm_state):
         """
         :param state: 1x84x84x3
         """
-        Q_value_t = self.session.run(
-            self.Q_value,
+        Q_value_t, lstm_state_out = self.session.run(
+            [self.Q_value, self.lstm_state],
             feed_dict={
                 self.s: [state], self.initial_lstm_state: lstm_state,
                 self.batch_size: 1, self.timestep: 1
-            })[0]
+            })
+        Q_value_t = Q_value_t[0]
         action_index = 0
         if random.random() <= self.epsilon:
             action_index = random.randrange(ACTIONS_DIM)
@@ -167,7 +171,7 @@ class DRQN(object):
         if self.epsilon > FINAL_EPSILON and self.global_t < EPSILON_TIME_STEP:
             self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
         max_q_value = np.max(Q_value_t)
-        return action_index, max_q_value
+        return action_index, max_q_value, lstm_state_out
 
     def train_Q_network(self):
         '''
@@ -183,12 +187,12 @@ class DRQN(object):
 
         y_batch = []
         # todo: need to feed with batch_size, timestep, lstm_state
-        lstm_state = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
+        lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_value_batch = self.session.run(
             self.Q_value,
             feed_dict={
                 self.s: next_state_batch,
-                self.initial_lstm_state: lstm_state,
+                self.initial_lstm_state: lstm_state_train,
                 self.batch_size: BATCH_SIZE,
                 self.timestep: LSTM_MAX_STEP
             }
@@ -255,7 +259,8 @@ def main():
         lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id, action_q = agent.epsilon_greedy(np.reshape(env.s_t[:, :, -1], (84, 84, 1)), lstm_state)
+            action_id, action_q, lstm_state = agent.epsilon_greedy(
+                np.reshape(env.s_t[:, :, -1], (84, 84, 1)), lstm_state)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
