@@ -13,18 +13,17 @@ INPUT_CHANNEL = 1
 ACTIONS_DIM = 2
 
 LSTM_UNITS = 256
-LSTM_MAX_STEP = 5
+LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
-FINAL_EPSILON = 0.0001
+FINAL_EPSILON = 0.1
 INITIAL_EPSILON = 1.0
-
-ALPHA = 1e-5  # the learning rate of optimizer
+ALPHA = 1e-4  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
-EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
-REPLAY_MEMORY = 50000
-BATCH_SIZE = 2
+EPSILON_TIME_STEP = 1 * 10 ** 4  # for annealing the epsilon greedy
+REPLAY_MEMORY = 1000
+BATCH_SIZE = 8
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
@@ -275,7 +274,7 @@ def main():
             print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q
 
             env.update()
-            if len(episode_buffer) >= 100:
+            if len(episode_buffer) >= 50:
                 # start a new episode buffer, in case of an over-long memory
                 agent.replay_buffer.add(episode_buffer)
                 episode_buffer = []
