@@ -12,18 +12,18 @@ INPUT_SIZE = 84
 INPUT_CHANNEL = 1
 ACTIONS_DIM = 2
 
-LSTM_UNITS = 256
+LSTM_UNITS = 512
 LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
-FINAL_EPSILON = 0.1
-INITIAL_EPSILON = 1.0
-ALPHA = 1e-4  # the learning rate of optimizer
+FINAL_EPSILON = 0.01
+INITIAL_EPSILON = 0.5
+ALPHA = 1e-6  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 4  # for annealing the epsilon greedy
 REPLAY_MEMORY = 1000
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
@@ -72,23 +72,23 @@ class DRQN(object):
         b_conv2 = bias_variable([32])
         h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
 
-        # W_conv3 = weight_variable([3, 3, 64, 64])
-        # b_conv3 = bias_variable([64])
-        # h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
+        W_conv3 = weight_variable([3, 3, 32, 64])
+        b_conv3 = bias_variable([64])
+        h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
 
-        h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
-        print h_conv2_out_size
-        h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
+        h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
+        print h_conv3_out_size
+        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
 
-        W_fc1 = weight_variable([h_conv2_out_size, LSTM_UNITS])
+        W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
         b_fc1 = bias_variable([LSTM_UNITS])
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
 
         # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
         self.timestep = tf.placeholder(dtype=tf.int32)
         self.batch_size = tf.placeholder(dtype=tf.int32)
 
-        h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, -1, LSTM_UNITS])
+        h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, self.timestep, LSTM_UNITS])
         self.lstm_cell = tf.contrib.rnn.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
         self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
@@ -101,6 +101,7 @@ class DRQN(object):
             scope='drqn'
         )
         print lstm_outputs.get_shape()
+        # shape: [batch_size*timestep, LSTM_UNITS]
         lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
 
         # readout layer: Q_value
@@ -164,6 +165,7 @@ class DRQN(object):
         action_index = 0
         if random.random() <= self.epsilon:
             action_index = random.randrange(ACTIONS_DIM)
+            print 'random-index:', action_index
         else:
             action_index = np.argmax(Q_value_t)
 
@@ -271,7 +273,8 @@ def main():
             episode_buffer.append((state, action, reward, next_state, terminal))
 
             agent.perceive(state, action, reward, next_state, terminal)
-            print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q
+            print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
+                '/epsilon:', agent.epsilon
 
             env.update()
             if len(episode_buffer) >= 50:
