@@ -21,12 +21,75 @@ INITIAL_EPSILON = 1.0
 ALPHA = 1e-6  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
-EPSILON_TIME_STEP = 2 * 10 ** 5  # for annealing the epsilon greedy
-REPLAY_MEMORY = 2000
+EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
+EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
 BATCH_SIZE = 4
+REPLAY_MEMORY = 2000
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
+
+
+class Network(object):
+
+    def __init__(self):
+        # input layer
+        s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
+
+        # hidden conv layer
+        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
+        b_conv1 = bias_variable([16])
+        h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
+
+        W_conv2 = weight_variable([4, 4, 16, 32])
+        b_conv2 = bias_variable([32])
+        h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
+
+        W_conv3 = weight_variable([3, 3, 32, 64])
+        b_conv3 = bias_variable([64])
+        h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
+
+        h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
+        print 'conv flat size:', h_conv3_out_size
+        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+
+        W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
+        b_fc1 = bias_variable([LSTM_UNITS])
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
+
+        # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
+        self.timestep = tf.placeholder(dtype=tf.int32)
+        self.batch_size = tf.placeholder(dtype=tf.int32)
+
+        h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, self.timestep, LSTM_UNITS])
+        self.lstm_cell = tf.contrib.rnn.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
+        self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
+        lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
+            self.lstm_cell,
+            h_fc1_reshaped,
+            initial_state=self.initial_lstm_state,
+            sequence_length=self.timestep,
+            time_major=False,
+            dtype=tf.float32,
+            scope='drqn'
+        )
+        print 'lstm shape:', lstm_outputs.get_shape()
+        # shape: [batch_size*timestep, LSTM_UNITS]
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
+
+        streamA, streamV = tf.split(lstm_outputs, 2, axis=1)
+        AW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, ACTIONS_DIM]))
+        VW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, 1]))
+        advantage = tf.matmul(streamA, AW)
+        value = tf.matmul(streamV, VW)
+
+        # readout layer: Q_value
+        Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
+        print 'Q shape:', Q_value.get_shape()
+
+        self.s = s
+        self.Q_value = Q_value
+        return
 
 
 class DRQN(object):
@@ -60,63 +123,13 @@ class DRQN(object):
         return
 
     def create_network(self):
-        # input layer
-        s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
-
-        # hidden conv layer
-        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
-        b_conv1 = bias_variable([16])
-        h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
-
-        W_conv2 = weight_variable([4, 4, 16, 32])
-        b_conv2 = bias_variable([32])
-        h_conv2 = tf.nn.relu(conv2d(h_conv1, W_conv2, 2) + b_conv2)
-
-        W_conv3 = weight_variable([3, 3, 32, 64])
-        b_conv3 = bias_variable([64])
-        h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
-
-        h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-        print h_conv3_out_size
-        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
-
-        W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
-        b_fc1 = bias_variable([LSTM_UNITS])
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
-
-        # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
-        self.timestep = tf.placeholder(dtype=tf.int32)
-        self.batch_size = tf.placeholder(dtype=tf.int32)
-
-        h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, self.timestep, LSTM_UNITS])
-        self.lstm_cell = tf.contrib.rnn.LSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
-        self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
-        lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
-            self.lstm_cell,
-            h_fc1_reshaped,
-            initial_state=self.initial_lstm_state,
-            sequence_length=self.timestep,
-            time_major=False,
-            dtype=tf.float32,
-            scope='drqn'
-        )
-        print lstm_outputs.get_shape()
-        # shape: [batch_size*timestep, LSTM_UNITS]
-        lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
-
-        # readout layer: Q_value
-        W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
-        b_fc2 = bias_variable([ACTIONS_DIM])
-        Q_value = tf.matmul(lstm_outputs, W_fc2) + b_fc2
-
-        self.s = s
-        self.Q_value = Q_value
+        self.mainNet = Network()
         return
 
     def create_minimize(self):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM], name='a')
         self.y = tf.placeholder('float', shape=[None], name='y')
-        Q_action = tf.reduce_sum(tf.multiply(self.Q_value, self.a), reduction_indices=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.mainNet.Q_value, self.a), axis=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         self.optimizer = tf.train.AdamOptimizer(ALPHA)
         self.apply_gradients = self.optimizer.minimize(self.loss)
@@ -146,8 +159,8 @@ class DRQN(object):
 
     def get_action_index(self, state, lstm_state):
         Q_value_t, lstm_state_out = self.session.run(
-            [self.Q_value, self.lstm_state],
-            feed_dict={self.s: [state], self.initial_lstm_state: lstm_state}
+            [self.mainNet.Q_value, self.mainNet.lstm_state],
+            feed_dict={self.mainNet.s: [state], self.mainNet.initial_lstm_state: lstm_state}
         )
         return np.argmax(Q_value_t[0]), np.max(Q_value_t[0]), lstm_state_out
 
@@ -156,10 +169,12 @@ class DRQN(object):
         :param state: 1x84x84x3
         """
         Q_value_t, lstm_state_out = self.session.run(
-            [self.Q_value, self.lstm_state],
+            [self.mainNet.Q_value, self.mainNet.lstm_state],
             feed_dict={
-                self.s: [state], self.initial_lstm_state: lstm_state,
-                self.batch_size: 1, self.timestep: 1
+                self.mainNet.s: [state],
+                self.mainNet.initial_lstm_state: lstm_state,
+                self.mainNet.batch_size: 1,
+                self.mainNet.timestep: 1
             })
         Q_value_t = Q_value_t[0]
         action_index = 0
@@ -169,8 +184,8 @@ class DRQN(object):
         else:
             action_index = np.argmax(Q_value_t)
 
-        if self.epsilon > FINAL_EPSILON and self.global_t < EPSILON_TIME_STEP:
-            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
+        if self.epsilon > FINAL_EPSILON:
+            self.epsilon -= EPSILON_ANNEAL
         max_q_value = np.max(Q_value_t)
         return action_index, max_q_value, lstm_state_out
 
@@ -190,12 +205,12 @@ class DRQN(object):
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_value_batch = self.session.run(
-            self.Q_value,
+            self.mainNet.Q_value,
             feed_dict={
-                self.s: next_state_batch,
-                self.initial_lstm_state: lstm_state_train,
-                self.batch_size: BATCH_SIZE,
-                self.timestep: LSTM_MAX_STEP
+                self.mainNet.s: next_state_batch,
+                self.mainNet.initial_lstm_state: lstm_state_train,
+                self.mainNet.batch_size: BATCH_SIZE,
+                self.mainNet.timestep: LSTM_MAX_STEP
             }
         )
         for i in range(len(state_batch)):
@@ -208,10 +223,10 @@ class DRQN(object):
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
             self.a: action_batch,
-            self.s: state_batch,
-            self.initial_lstm_state: lstm_state_train,
-            self.batch_size: BATCH_SIZE,
-            self.timestep: LSTM_MAX_STEP
+            self.mainNet.s: state_batch,
+            self.mainNet.initial_lstm_state: lstm_state_train,
+            self.mainNet.batch_size: BATCH_SIZE,
+            self.mainNet.timestep: LSTM_MAX_STEP
         })
 
         return
