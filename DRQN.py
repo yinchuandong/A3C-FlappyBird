@@ -21,7 +21,8 @@ INITIAL_EPSILON = 0.5
 ALPHA = 1e-6  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
-EPSILON_TIME_STEP = 1 * 10 ** 4  # for annealing the epsilon greedy
+EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
+EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
 REPLAY_MEMORY = 1000
 BATCH_SIZE = 4
 
@@ -49,7 +50,7 @@ class Network(object):
         h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
 
         h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-        print h_conv3_out_size
+        print 'conv flat size:', h_conv3_out_size
         h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
 
         W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
@@ -72,14 +73,19 @@ class Network(object):
             dtype=tf.float32,
             scope='drqn'
         )
-        print lstm_outputs.get_shape()
+        print 'lstm shape:', lstm_outputs.get_shape()
         # shape: [batch_size*timestep, LSTM_UNITS]
         lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
 
+        streamA, streamV = tf.split(lstm_outputs, 2, axis=1)
+        AW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, ACTIONS_DIM]))
+        VW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, 1]))
+        advantage = tf.matmul(streamA, AW)
+        value = tf.matmul(streamV, VW)
+
         # readout layer: Q_value
-        W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
-        b_fc2 = bias_variable([ACTIONS_DIM])
-        Q_value = tf.matmul(lstm_outputs, W_fc2) + b_fc2
+        Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
+        print 'Q shape:', Q_value.get_shape()
 
         self.s = s
         self.Q_value = Q_value
@@ -178,8 +184,8 @@ class DRQN(object):
         else:
             action_index = np.argmax(Q_value_t)
 
-        if self.epsilon > FINAL_EPSILON and self.global_t < EPSILON_TIME_STEP:
-            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
+        if self.epsilon > FINAL_EPSILON:
+            self.epsilon -= EPSILON_ANNEAL
         max_q_value = np.max(Q_value_t)
         return action_index, max_q_value, lstm_state_out
 
