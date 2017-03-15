@@ -24,7 +24,7 @@ MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
 BATCH_SIZE = 4
-REPLAY_MEMORY = 2000
+REPLAY_MEMORY = 10000
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
