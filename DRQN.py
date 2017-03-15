@@ -129,7 +129,7 @@ class DRQN(object):
     def create_minimize(self):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM], name='a')
         self.y = tf.placeholder('float', shape=[None], name='y')
-        Q_action = tf.reduce_sum(tf.multiply(self.mainNet.Q_value, self.a), reduction_indices=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.mainNet.Q_value, self.a), axis=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         self.optimizer = tf.train.AdamOptimizer(ALPHA)
         self.apply_gradients = self.optimizer.minimize(self.loss)
