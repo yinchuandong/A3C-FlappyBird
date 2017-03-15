@@ -16,13 +16,13 @@ LSTM_UNITS = 512
 LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
-FINAL_EPSILON = 0.01
-INITIAL_EPSILON = 0.5
+FINAL_EPSILON = 0.1
+INITIAL_EPSILON = 1.0
 ALPHA = 1e-6  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
-EPSILON_TIME_STEP = 1 * 10 ** 4  # for annealing the epsilon greedy
-REPLAY_MEMORY = 1000
+EPSILON_TIME_STEP = 2 * 10 ** 5  # for annealing the epsilon greedy
+REPLAY_MEMORY = 2000
 BATCH_SIZE = 4
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
