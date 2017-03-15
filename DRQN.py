@@ -29,37 +29,9 @@ CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
 
 
-class DRQN(object):
+class Network(object):
 
     def __init__(self):
-        self.global_t = 0
-        self.replay_buffer = ReplayBuffer(REPLAY_MEMORY)
-        self.epsilon = INITIAL_EPSILON
-
-        # q-network parameter
-        self.create_network()
-        self.create_minimize()
-
-        # init session
-        self.session = tf.InteractiveSession()
-        self.session.run(tf.global_variables_initializer())
-
-        self.saver = tf.train.Saver(tf.global_variables())
-        self.restore()
-
-        # for recording the log into tensorboard
-        self.time_input = tf.placeholder(tf.float32)
-        self.reward_input = tf.placeholder(tf.float32)
-        tf.summary.scalar('living_time', self.time_input)
-        tf.summary.scalar('reward', self.reward_input)
-        self.summary_op = tf.summary.merge_all()
-        self.summary_writer = tf.summary.FileWriter(LOG_FILE, self.session.graph)
-
-        self.episode_start_time = 0.0
-        self.episode_reward = 0.0
-        return
-
-    def create_network(self):
         # input layer
         s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
 
@@ -113,10 +85,45 @@ class DRQN(object):
         self.Q_value = Q_value
         return
 
+
+class DRQN(object):
+
+    def __init__(self):
+        self.global_t = 0
+        self.replay_buffer = ReplayBuffer(REPLAY_MEMORY)
+        self.epsilon = INITIAL_EPSILON
+
+        # q-network parameter
+        self.create_network()
+        self.create_minimize()
+
+        # init session
+        self.session = tf.InteractiveSession()
+        self.session.run(tf.global_variables_initializer())
+
+        self.saver = tf.train.Saver(tf.global_variables())
+        self.restore()
+
+        # for recording the log into tensorboard
+        self.time_input = tf.placeholder(tf.float32)
+        self.reward_input = tf.placeholder(tf.float32)
+        tf.summary.scalar('living_time', self.time_input)
+        tf.summary.scalar('reward', self.reward_input)
+        self.summary_op = tf.summary.merge_all()
+        self.summary_writer = tf.summary.FileWriter(LOG_FILE, self.session.graph)
+
+        self.episode_start_time = 0.0
+        self.episode_reward = 0.0
+        return
+
+    def create_network(self):
+        self.mainNet = Network()
+        return
+
     def create_minimize(self):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM], name='a')
         self.y = tf.placeholder('float', shape=[None], name='y')
-        Q_action = tf.reduce_sum(tf.multiply(self.Q_value, self.a), reduction_indices=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.mainNet.Q_value, self.a), reduction_indices=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         self.optimizer = tf.train.AdamOptimizer(ALPHA)
         self.apply_gradients = self.optimizer.minimize(self.loss)
@@ -146,8 +153,8 @@ class DRQN(object):
 
     def get_action_index(self, state, lstm_state):
         Q_value_t, lstm_state_out = self.session.run(
-            [self.Q_value, self.lstm_state],
-            feed_dict={self.s: [state], self.initial_lstm_state: lstm_state}
+            [self.mainNet.Q_value, self.mainNet.lstm_state],
+            feed_dict={self.mainNet.s: [state], self.mainNet.initial_lstm_state: lstm_state}
         )
         return np.argmax(Q_value_t[0]), np.max(Q_value_t[0]), lstm_state_out
 
@@ -156,10 +163,12 @@ class DRQN(object):
         :param state: 1x84x84x3
         """
         Q_value_t, lstm_state_out = self.session.run(
-            [self.Q_value, self.lstm_state],
+            [self.mainNet.Q_value, self.mainNet.lstm_state],
             feed_dict={
-                self.s: [state], self.initial_lstm_state: lstm_state,
-                self.batch_size: 1, self.timestep: 1
+                self.mainNet.s: [state],
+                self.mainNet.initial_lstm_state: lstm_state,
+                self.mainNet.batch_size: 1,
+                self.mainNet.timestep: 1
             })
         Q_value_t = Q_value_t[0]
         action_index = 0
@@ -190,12 +199,12 @@ class DRQN(object):
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_value_batch = self.session.run(
-            self.Q_value,
+            self.mainNet.Q_value,
             feed_dict={
-                self.s: next_state_batch,
-                self.initial_lstm_state: lstm_state_train,
-                self.batch_size: BATCH_SIZE,
-                self.timestep: LSTM_MAX_STEP
+                self.mainNet.s: next_state_batch,
+                self.mainNet.initial_lstm_state: lstm_state_train,
+                self.mainNet.batch_size: BATCH_SIZE,
+                self.mainNet.timestep: LSTM_MAX_STEP
             }
         )
         for i in range(len(state_batch)):
@@ -208,10 +217,10 @@ class DRQN(object):
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
             self.a: action_batch,
-            self.s: state_batch,
-            self.initial_lstm_state: lstm_state_train,
-            self.batch_size: BATCH_SIZE,
-            self.timestep: LSTM_MAX_STEP
+            self.mainNet.s: state_batch,
+            self.mainNet.initial_lstm_state: lstm_state_train,
+            self.mainNet.batch_size: BATCH_SIZE,
+            self.mainNet.timestep: LSTM_MAX_STEP
         })
 
         return
