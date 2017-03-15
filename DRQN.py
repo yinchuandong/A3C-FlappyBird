@@ -24,7 +24,7 @@ MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
 BATCH_SIZE = 4
-REPLAY_MEMORY = 10000
+REPLAY_MEMORY = 5000
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
@@ -97,7 +97,6 @@ class DRQN(object):
     def __init__(self):
         self.global_t = 0
         self.replay_buffer = ReplayBuffer(REPLAY_MEMORY)
-        self.epsilon = INITIAL_EPSILON
 
         # q-network parameter
         self.create_network()
@@ -109,6 +108,10 @@ class DRQN(object):
 
         self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
+
+        self.epsilon = 1 - float(INITIAL_EPSILON - FINAL_EPSILON) \
+            * min(self.global_t, EPSILON_TIME_STEP) / float(EPSILON_TIME_STEP)
+
 
         # for recording the log into tensorboard
         self.time_input = tf.placeholder(tf.float32)
