@@ -19,6 +19,8 @@ GAMMA = 0.99
 FINAL_EPSILON = 0.01
 INITIAL_EPSILON = 0.5
 ALPHA = 1e-6  # the learning rate of optimizer
+TAU = 0.001
+UPDATE_FREQUENCY = 5  # the frequency to update target network
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
@@ -32,7 +34,7 @@ LOG_FILE = 'tmp_drqn/log'
 
 class Network(object):
 
-    def __init__(self):
+    def __init__(self, scope):
         # input layer
         s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
 
@@ -71,7 +73,7 @@ class Network(object):
             sequence_length=self.timestep,
             time_major=False,
             dtype=tf.float32,
-            scope='drqn'
+            scope=scope
         )
         print 'lstm shape:', lstm_outputs.get_shape()
         # shape: [batch_size*timestep, LSTM_UNITS]
@@ -106,6 +108,7 @@ class DRQN(object):
         # init session
         self.session = tf.InteractiveSession()
         self.session.run(tf.global_variables_initializer())
+        update_target(self.session, self.target_ops)
 
         self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
@@ -123,7 +126,9 @@ class DRQN(object):
         return
 
     def create_network(self):
-        self.mainNet = Network()
+        self.mainNet = Network(scope='main')
+        self.targetNet = Network(scope='target')
+        self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
         return
 
     def create_minimize(self):
@@ -194,6 +199,12 @@ class DRQN(object):
         do backpropogation
         '''
         # len(minibatch) = BATCH_SIZE * LSTM_MAX_STEP
+        
+        if self.global_t % (UPDATE_FREQUENCY * 100) == 0:
+            update_target(self.session, self.target_ops)
+
+        if self.global_t % UPDATE_FREQUENCY != 0:
+            return
         minibatch = self.replay_buffer.sample(BATCH_SIZE, LSTM_MAX_STEP)
         state_batch = [t[0] for t in minibatch]
         action_batch = [t[1] for t in minibatch]
@@ -205,12 +216,12 @@ class DRQN(object):
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_value_batch = self.session.run(
-            self.mainNet.Q_value,
+            self.targetNet.Q_value,
             feed_dict={
-                self.mainNet.s: next_state_batch,
-                self.mainNet.initial_lstm_state: lstm_state_train,
-                self.mainNet.batch_size: BATCH_SIZE,
-                self.mainNet.timestep: LSTM_MAX_STEP
+                self.targetNet.s: next_state_batch,
+                self.targetNet.initial_lstm_state: lstm_state_train,
+                self.targetNet.batch_size: BATCH_SIZE,
+                self.targetNet.timestep: LSTM_MAX_STEP
             }
         )
         for i in range(len(state_batch)):
@@ -273,6 +284,7 @@ def main():
     while True:
         episode_buffer = []
         lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
+        count = 0
         while not env.terminal:
             # action_id = random.randint(0, 1)
             action_id, action_q, lstm_state = agent.epsilon_greedy(
@@ -285,8 +297,9 @@ def main():
             next_state = np.reshape(env.s_t1[:, :, -1], (84, 84, 1))
             reward = env.reward
             terminal = env.terminal
-            episode_buffer.append((state, action, reward, next_state, terminal))
-
+            # frame skip
+            if count % 3 == 0:
+                episode_buffer.append((state, action, reward, next_state, terminal))
             agent.perceive(state, action, reward, next_state, terminal)
             print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
                 '/epsilon:', agent.epsilon
@@ -297,6 +310,7 @@ def main():
                 agent.replay_buffer.add(episode_buffer)
                 episode_buffer = []
                 print '----------- episode buffer > 100---------'
+            count += 1
         # reset the state
         env.reset()
         if len(episode_buffer) > LSTM_MAX_STEP:

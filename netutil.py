@@ -34,3 +34,24 @@ def lstm_last_relevant(output, length):
     flat = tf.reshape(output, [-1, output_size])
     relevant = tf.gather(flat, index)
     return relevant
+
+
+def update_target_graph_op(trainable_vars, tau=0.001):
+
+    size = len(trainable_vars)
+    update_ops = []
+    for i, var in enumerate(trainable_vars[0:size / 2]):
+        target = trainable_vars[size // 2 + i]
+        op = tf.assign(target, tau * var.value() + (1 - tau) * target.value())
+        update_ops.append(op)
+    return update_ops
+
+
+def update_target(session, update_ops):
+    session.run(update_ops)
+    tf_vars = tf.trainable_variables()
+    size = len(tf.trainable_variables())
+    theta = session.run(tf_vars[0])
+    theta_prime = session.run(tf_vars[size // 2])
+    assert(theta.all() == theta_prime.all())
+    return
