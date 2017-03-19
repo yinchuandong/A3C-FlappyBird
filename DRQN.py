@@ -129,15 +129,15 @@ class DRQN(object):
         return
 
     def create_network(self):
-        self.mainNet = Network(scope='main')
-        self.targetNet = Network(scope='target')
+        self.main_net = Network(scope='main')
+        self.target_net = Network(scope='target')
         self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
         return
 
     def create_minimize(self):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM], name='a')
         self.y = tf.placeholder('float', shape=[None], name='y')
-        Q_action = tf.reduce_sum(tf.multiply(self.mainNet.Q_value, self.a), axis=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         self.optimizer = tf.train.AdamOptimizer(ALPHA)
         self.apply_gradients = self.optimizer.minimize(self.loss)
@@ -167,8 +167,8 @@ class DRQN(object):
 
     def get_action_index(self, state, lstm_state):
         Q_value_t, lstm_state_out = self.session.run(
-            [self.mainNet.Q_value, self.mainNet.lstm_state],
-            feed_dict={self.mainNet.s: [state], self.mainNet.initial_lstm_state: lstm_state}
+            [self.main_net.Q_value, self.main_net.lstm_state],
+            feed_dict={self.main_net.s: [state], self.main_net.initial_lstm_state: lstm_state}
         )
         return np.argmax(Q_value_t[0]), np.max(Q_value_t[0]), lstm_state_out
 
@@ -177,12 +177,12 @@ class DRQN(object):
         :param state: 1x84x84x3
         """
         Q_value_t, lstm_state_out = self.session.run(
-            [self.mainNet.Q_value, self.mainNet.lstm_state],
+            [self.main_net.Q_value, self.main_net.lstm_state],
             feed_dict={
-                self.mainNet.s: [state],
-                self.mainNet.initial_lstm_state: lstm_state,
-                self.mainNet.batch_size: 1,
-                self.mainNet.timestep: 1
+                self.main_net.s: [state],
+                self.main_net.initial_lstm_state: lstm_state,
+                self.main_net.batch_size: 1,
+                self.main_net.timestep: 1
             })
         Q_value_t = Q_value_t[0]
         action_index = 0
@@ -219,12 +219,12 @@ class DRQN(object):
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_value_batch = self.session.run(
-            self.targetNet.Q_value,
+            self.target_net.Q_value,
             feed_dict={
-                self.targetNet.s: next_state_batch,
-                self.targetNet.initial_lstm_state: lstm_state_train,
-                self.targetNet.batch_size: BATCH_SIZE,
-                self.targetNet.timestep: LSTM_MAX_STEP
+                self.target_net.s: next_state_batch,
+                self.target_net.initial_lstm_state: lstm_state_train,
+                self.target_net.batch_size: BATCH_SIZE,
+                self.target_net.timestep: LSTM_MAX_STEP
             }
         )
         for i in range(len(state_batch)):
@@ -237,10 +237,10 @@ class DRQN(object):
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
             self.a: action_batch,
-            self.mainNet.s: state_batch,
-            self.mainNet.initial_lstm_state: lstm_state_train,
-            self.mainNet.batch_size: BATCH_SIZE,
-            self.mainNet.timestep: LSTM_MAX_STEP
+            self.main_net.s: state_batch,
+            self.main_net.initial_lstm_state: lstm_state_train,
+            self.main_net.batch_size: BATCH_SIZE,
+            self.main_net.timestep: LSTM_MAX_STEP
         })
 
         return
