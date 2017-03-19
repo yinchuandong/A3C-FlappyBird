@@ -88,9 +88,11 @@ class Network(object):
         # readout layer: Q_value
         Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
         print 'Q shape:', Q_value.get_shape()
+        Q_action = tf.argmax(Q_value, 1)
 
         self.s = s
         self.Q_value = Q_value
+        self.Q_action = Q_action
         return
 
 
@@ -218,8 +220,17 @@ class DRQN(object):
         y_batch = []
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
-        Q_value_batch = self.session.run(
-            self.target_net.Q_value,
+        Q_value = self.session.run(
+            self.main_net.Q_value,
+            feed_dict={
+                self.main_net.s: next_state_batch,
+                self.main_net.initial_lstm_state: lstm_state_train,
+                self.main_net.batch_size: BATCH_SIZE,
+                self.main_net.timestep: LSTM_MAX_STEP
+            }
+        )
+        Q_action = self.session.run(
+            self.target_net.Q_action,
             feed_dict={
                 self.target_net.s: next_state_batch,
                 self.target_net.initial_lstm_state: lstm_state_train,
@@ -232,7 +243,7 @@ class DRQN(object):
             if terminal:
                 y_batch.append(reward_batch[i])
             else:
-                y_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
+                y_batch.append(reward_batch[i] + GAMMA * Q_value[i][Q_action[i]])
 
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
