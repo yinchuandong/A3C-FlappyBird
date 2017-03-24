@@ -29,7 +29,7 @@ class A3C(object):
         if USE_LSTM:
             self.global_network = A3CLSTMNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device, -1)
         else:
-            self.global_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device)
+            self.global_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, self.device, -1)
 
         self.initial_learning_rate = log_uniform(INITIAL_ALPHA_LOW, INITIAL_ALPHA_HIGH, INITIAL_ALPHA_LOG_RATE)
         self.learning_rate_input = tf.placeholder('float')
@@ -43,16 +43,16 @@ class A3C(object):
             self.actor_threads.append(actor_thread)
 
         self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=False, allow_soft_placement=True))
-        self.sess.run(tf.initialize_all_variables())
+        self.sess.run(tf.global_variables_initializer())
 
         self.reward_input = tf.placeholder(tf.float32)
-        tf.scalar_summary('reward', self.reward_input)
+        tf.summary.scalar('reward', self.reward_input)
 
         self.time_input = tf.placeholder(tf.float32)
-        tf.scalar_summary('living_time', self.time_input)
+        tf.summary.scalar('living_time', self.time_input)
 
-        self.summary_op = tf.merge_all_summaries()
-        self.summary_writer = tf.train.SummaryWriter(LOG_FILE, self.sess.graph)
+        self.summary_op = tf.summary.merge_all()
+        self.summary_writer = tf.summary.FileWriter(LOG_FILE, self.sess.graph)
 
         self.saver = tf.train.Saver()
         self.restore()
@@ -85,16 +85,14 @@ class A3C(object):
         while True:
             if self.stop_requested or (self.global_t > MAX_TIME_STEP):
                 break
+            # need to lock only when updating global gradients
+            # lock.acquire()
             diff_global_t = actor_thread.process(
                 self.sess, self.global_t,
                 self.summary_writer, self.summary_op,
                 self.reward_input, self.time_input
             )
-
-            # need to lock only when updating global gradients
-            lock.acquire()
-            actor_thread.update_global_gradient(self.sess, self.global_t)
-            lock.release()
+            # lock.release()
 
             self.global_t += diff_global_t
             if self.global_t % 1000000 < LOCAL_T_MAX:

@@ -3,7 +3,6 @@ import numpy as np
 import random
 import time
 
-from accum_trainer import AccumTrainer
 from a3c_network import A3CFFNetwork, A3CLSTMNetwork
 from config import *
 from game.game_state import GameState
@@ -32,17 +31,13 @@ class A3CActorThread(object):
         if USE_LSTM:
             self.local_network = A3CLSTMNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device, thread_index)
         else:
-            self.local_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device)
+            self.local_network = A3CFFNetwork(STATE_DIM, STATE_CHN, ACTION_DIM, device, thread_index)
         self.local_network.create_loss(ENTROPY_BETA)
-        self.trainer = AccumTrainer(device)
-        self.trainer.create_minimize(self.local_network.total_loss, self.local_network.get_vars())
-        self.accum_gradients = self.trainer.accumulate_gradients()
-        self.reset_gradients = self.trainer.reset_gradients()
+        self.gradients = tf.gradients(self.local_network.total_loss, self.local_network.get_vars())
 
-        clip_accum_grads = [tf.clip_by_norm(accum_grad, 10.0) for accum_grad in self.trainer.get_accum_grad_list()]
-        self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
-        # self.apply_gradients = optimizer.apply_gradients(
-        #     zip(self.trainer.get_accum_grad_list(), global_network.get_vars()))
+        # clip_accum_grads = [tf.clip_by_norm(accum_grad, 10.0) for accum_grad in self.gradients]
+        # self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
+        self.apply_gradients = optimizer.apply_gradients(zip(self.gradients, global_network.get_vars()))
 
         self.sync = self.local_network.sync_from(global_network)
 
@@ -83,6 +78,7 @@ class A3CActorThread(object):
             time_input: living_time
         })
         summary_writer.add_summary(summary_str, global_t)
+        summary_writer.flush()
         return
 
     def process(self, sess, global_t, summary_writer, summary_op, reward_input, time_input):
@@ -96,7 +92,6 @@ class A3CActorThread(object):
         if self.episode_start_time == 0.0:
             self.episode_start_time = timestamp()
 
-        sess.run(self.reset_gradients)
         # copy weight from global network
         sess.run(self.sync)
 
@@ -178,39 +173,32 @@ class A3CActorThread(object):
             batch_td.append(td)
             batch_R.append(R)
 
+        cur_learning_rate = self._anneal_learning_rate(global_t)
         if USE_LSTM:
             batch_state.reverse()
             batch_action.reverse()
             batch_td.reverse()
             batch_R.reverse()
-            sess.run(self.accum_gradients, feed_dict={
+            sess.run(self.apply_gradients, feed_dict={
                 self.local_network.state_input: batch_state,
                 self.local_network.action_input: batch_action,
                 self.local_network.td: batch_td,
                 self.local_network.R: batch_R,
                 self.local_network.step_size: [len(batch_state)],
-                self.local_network.initial_lstm_state: start_lstm_state
+                self.local_network.initial_lstm_state: start_lstm_state,
+                self.learning_rate_input: cur_learning_rate
             })
         else:
-            sess.run(self.accum_gradients, feed_dict={
+            sess.run(self.apply_gradients, feed_dict={
                 self.local_network.state_input: batch_state,
                 self.local_network.action_input: batch_action,
                 self.local_network.td: batch_td,
-                self.local_network.R: batch_R
+                self.local_network.R: batch_R,
+                self.learning_rate_input: cur_learning_rate
             })
 
         diff_local_t = self.local_t - start_local_t
         return diff_local_t
-
-    def update_global_gradient(self, sess, global_t):
-        '''
-        update the gradient of global, need to add thread lock in case of conc
-        '''
-        cur_learning_rate = self._anneal_learning_rate(global_t)
-        sess.run(self.apply_gradients, feed_dict={
-            self.learning_rate_input: cur_learning_rate
-        })
-        return
 
 
 if __name__ == '__main__':

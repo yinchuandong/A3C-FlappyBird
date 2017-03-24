@@ -1,8 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-from custom_lstm import CustomBasicLSTMCell
 from netutil import *
+from config import LSTM_UNITS
 
 
 class A3CNetwork(object):
@@ -27,7 +27,7 @@ class A3CNetwork(object):
         # policy loss L = log pi(a|s, theta) * (R - V)
         # (Adding minus, because the original paper's objective function is for gradient ascent,
         # but we use gradient descent optimizer.)
-        policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.mul(log_pi, self.action_input),
+        policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.multiply(log_pi, self.action_input),
                                                    reduction_indices=1) * self.td + entropy * entropy_beta)
 
         # R (input for value)
@@ -65,8 +65,9 @@ class A3CNetwork(object):
 
 class A3CFFNetwork(A3CNetwork):
 
-    def __init__(self, state_dim, state_chn, action_dim, device='/cpu:0'):
+    def __init__(self, state_dim, state_chn, action_dim, device='/cpu:0', thread_index='-1'):
         A3CNetwork.__init__(self, state_dim, state_chn, action_dim, device)
+        self._thread_index = thread_index
         self._create_network()
         return
 
@@ -74,7 +75,8 @@ class A3CFFNetwork(A3CNetwork):
         state_dim = self._state_dim
         state_chn = self._state_chn
         action_dim = self._action_dim
-        with tf.device(self._device):
+        scope_name = "net_" + str(self._thread_index)
+        with tf.device(self._device), tf.variable_scope(scope_name) as scope:
             # state input
             self.state_input = tf.placeholder('float', [None, state_dim, state_dim, state_chn])
 
@@ -152,7 +154,8 @@ class A3CLSTMNetwork(A3CNetwork):
         state_dim = self._state_dim
         state_chn = self._state_chn
         action_dim = self._action_dim
-        with tf.device(self._device):
+        scope_name = 'net_' + str(self._thread_index)
+        with tf.device(self._device), tf.variable_scope(scope_name) as scope:
             # state input
             self.state_input = tf.placeholder('float', [None, state_dim, state_dim, state_chn])
 
@@ -185,18 +188,14 @@ class A3CLSTMNetwork(A3CNetwork):
             h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
 
             # reshape to fit lstm (1, 5, 256)
-            h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, 256])
+            h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, LSTM_UNITS])
 
-            self.lstm = CustomBasicLSTMCell(256)
             self.step_size = tf.placeholder('float', [1])
-            self.initial_lstm_state = tf.placeholder('float', [1, self.lstm.state_size])
-            scope = 'net_' + str(self._thread_index)
+            self.lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
+            self.initial_lstm_state = self.lstm_cell.zero_state(1, tf.float32)
 
-            # Unrolling LSTM up to LOCAL_T_MAX time steps. (= 5time steps.)
-            # (time_major = False, so output shape is [batch_size, max_time, cell.output_size])
-            # refer: https://www.tensorflow.org/versions/r0.11/api_docs/python/nn.html#dynamic_rnn
             lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
-                self.lstm,
+                self.lstm_cell,
                 h_fc1_reshaped,
                 initial_state=self.initial_lstm_state,
                 sequence_length=self.step_size,
@@ -204,7 +203,7 @@ class A3CLSTMNetwork(A3CNetwork):
                 scope=scope
             )
             print lstm_outputs.get_shape()
-            lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
+            lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
 
             # fc2: (pi) for policy output
             self.W_fc2 = weight_variable([256, action_dim])
@@ -217,11 +216,15 @@ class A3CLSTMNetwork(A3CNetwork):
             v_ = tf.matmul(lstm_outputs, self.W_fc3) + self.b_fc3
             self.value_output = tf.reshape(v_, [-1])
 
+            scope.reuse_variables()
+            self.W_lstm = tf.get_variable("basic_lstm_cell/weights")
+            self.b_lstm = tf.get_variable("basic_lstm_cell/biases")
+
             self.reset_lstm_state()
         return
 
     def reset_lstm_state(self):
-        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
+        self.lstm_state_out = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
         return
 
     def get_vars(self):
@@ -230,7 +233,7 @@ class A3CLSTMNetwork(A3CNetwork):
             self.W_conv2, self.b_conv2,
             # self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
-            self.lstm.matrix, self.lstm.bias,
+            self.W_lstm, self.b_lstm,
             self.W_fc2, self.b_fc2,
             self.W_fc3, self.b_fc3
         ]

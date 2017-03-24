@@ -19,10 +19,8 @@ class AccumTrainer(object):
 
     def create_minimize(self, loss, var_list):
         with tf.device(self._device):
-            # todo: check the necessarity of var_refs
-            var_refs = [v.ref() for v in var_list]
             self._var_list = var_list
-            self._grad_list = tf.gradients(loss, var_refs)
+            self._grad_list = tf.gradients(loss, var_list)
             self._accum_grad_list = []
 
             with tf.control_dependencies(None):
