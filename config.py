@@ -19,6 +19,6 @@ USE_GPU = True
 USE_LSTM = True
 LSTM_UNITS = 256
 
-CHECKPOINT_DIR = 'tmp/checkpoints'
-LOG_FILE = 'tmp/a3c_log'
+CHECKPOINT_DIR = 'tmp_a3c/checkpoints'
+LOG_FILE = 'tmp_a3c/log'
 
