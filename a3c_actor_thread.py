@@ -35,9 +35,9 @@ class A3CActorThread(object):
         self.local_network.create_loss(ENTROPY_BETA)
         self.gradients = tf.gradients(self.local_network.total_loss, self.local_network.get_vars())
 
-        # clip_accum_grads = [tf.clip_by_norm(accum_grad, 10.0) for accum_grad in self.gradients]
-        # self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
-        self.apply_gradients = optimizer.apply_gradients(zip(self.gradients, global_network.get_vars()))
+        clip_accum_grads = [tf.clip_by_norm(accum_grad, 10.0) for accum_grad in self.gradients]
+        self.apply_gradients = optimizer.apply_gradients(zip(clip_accum_grads, global_network.get_vars()))
+        # self.apply_gradients = optimizer.apply_gradients(zip(self.gradients, global_network.get_vars()))
 
         self.sync = self.local_network.sync_from(global_network)
 
@@ -60,17 +60,7 @@ class A3CActorThread(object):
         return learning_rate
 
     def choose_action(self, policy_output):
-        values = []
-        sum = 0.0
-        for rate in policy_output:
-            sum += rate
-            values.append(sum)
-
-        r = random.random() * sum
-        for i in range(len(values)):
-            if values[i] >= r:
-                return i
-        return len(values) - 1
+        return np.random.choice(range(len(policy_output)), p=policy_output)
 
     def _record_log(self, sess, global_t, summary_writer, summary_op, reward_input, reward, time_input, living_time):
         summary_str = sess.run(summary_op, feed_dict={

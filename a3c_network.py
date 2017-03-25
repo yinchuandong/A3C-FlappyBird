@@ -23,12 +23,12 @@ class A3CNetwork(object):
         # avoid NaN
         log_pi = tf.log(tf.clip_by_value(self.policy_output, 1e-20, 1.0))
         # policy entropy
-        entropy = -tf.reduce_sum(self.policy_output * log_pi, reduction_indices=1)
+        entropy = -tf.reduce_sum(self.policy_output * log_pi, axis=1)
         # policy loss L = log pi(a|s, theta) * (R - V)
         # (Adding minus, because the original paper's objective function is for gradient ascent,
         # but we use gradient descent optimizer.)
         policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.multiply(log_pi, self.action_input),
-                                                   reduction_indices=1) * self.td + entropy * entropy_beta)
+                                                   axis=1) * self.td + entropy * entropy_beta)
 
         # R (input for value)
         self.R = tf.placeholder('float', [None])
@@ -57,7 +57,7 @@ class A3CNetwork(object):
 
         sync_ops = []
         with tf.device(self._device):
-            with tf.name_scope(name, 'A3CFFNetwork') as scope:
+            with tf.name_scope(name, 'A3CNetwork') as scope:
                 for (src_var, dst_var) in zip(src_vars, dst_vars):
                     sync_ops.append(tf.assign(dst_var, src_var))
                 return tf.group(*sync_ops, name=scope)
