@@ -37,7 +37,9 @@ def lstm_last_relevant(output, length):
 
 
 def update_target_graph_op(trainable_vars, tau=0.001):
-
+    '''
+    theta_prime = tau * theta + (1 - tau) * theta_prime
+    '''
     size = len(trainable_vars)
     update_ops = []
     for i, var in enumerate(trainable_vars[0:size / 2]):
