@@ -236,7 +236,7 @@ class DRQN(object):
         y_batch = []
         # todo: need to feed with batch_size, timestep, lstm_state
         lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
-        Q_value = self.session.run(
+        Q_target = self.session.run(
             self.main_net.Q_value,
             feed_dict={
                 self.main_net.state_input: next_state_batch,
@@ -245,21 +245,22 @@ class DRQN(object):
                 self.main_net.timestep: LSTM_MAX_STEP
             }
         )
-        Q_action = self.session.run(
-            self.target_net.Q_action,
-            feed_dict={
-                self.target_net.state_input: next_state_batch,
-                self.target_net.initial_lstm_state: lstm_state_train,
-                self.target_net.batch_size: BATCH_SIZE,
-                self.target_net.timestep: LSTM_MAX_STEP
-            }
-        )
+        # Q_action = self.session.run(
+        #     self.target_net.Q_action,
+        #     feed_dict={
+        #         self.target_net.state_input: next_state_batch,
+        #         self.target_net.initial_lstm_state: lstm_state_train,
+        #         self.target_net.batch_size: BATCH_SIZE,
+        #         self.target_net.timestep: LSTM_MAX_STEP
+        #     }
+        # )
         for i in range(len(state_batch)):
             terminal = terminal_batch[i]
             if terminal:
                 y_batch.append(reward_batch[i])
             else:
-                y_batch.append(reward_batch[i] + GAMMA * Q_value[i][Q_action[i]])
+                y_batch.append(reward_batch[i] + GAMMA * np.max(Q_target[i]))
+                # y_batch.append(reward_batch[i] + GAMMA * Q_value[i][Q_action[i]])
 
         self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
