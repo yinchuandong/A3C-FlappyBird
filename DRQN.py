@@ -68,6 +68,7 @@ class Network(object):
             h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, self.timestep, LSTM_UNITS])
             self.lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
             self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
+
             lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
                 self.lstm_cell,
                 h_fc1_reshaped,
@@ -81,16 +82,21 @@ class Network(object):
             # shape: [batch_size*timestep, LSTM_UNITS]
             lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
 
-            streamA, streamV = tf.split(lstm_outputs, 2, axis=1)
-            self.AW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, ACTIONS_DIM]))
-            self.VW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, 1]))
-            advantage = tf.matmul(streamA, self.AW)
-            value = tf.matmul(streamV, self.VW)
+            # option1: for separate channel
+            # streamA, streamV = tf.split(lstm_outputs, 2, axis=1)
+            # self.AW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, ACTIONS_DIM]))
+            # self.VW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, 1]))
+            # advantage = tf.matmul(streamA, self.AW)
+            # value = tf.matmul(streamV, self.VW)
+            # self.Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
 
-            # readout layer: Q_value
-            self.Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
-            print 'Q shape:', self.Q_value.get_shape()
+            # option2: for fully-connected
+            self.W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
+            self.b_fc2 = bias_variable([ACTIONS_DIM])
+            self.Q_value = tf.matmul(lstm_outputs, self.W_fc2) + self.b_fc2
+
             self.Q_action = tf.argmax(self.Q_value, 1)
+            print 'Q shape:', self.Q_value.get_shape()
 
             scope.reuse_variables()
             self.W_lstm = tf.get_variable("basic_lstm_cell/weights")
@@ -105,7 +111,8 @@ class Network(object):
             # self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
             self.W_lstm, self.b_lstm,
-            self.AW, self.VW
+            # self.AW, self.VW
+            self.W_fc2, self.b_fc2,
         ]
 
 
