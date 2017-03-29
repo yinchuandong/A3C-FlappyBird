@@ -44,7 +44,8 @@ def update_target_graph_op(trainable_vars, tau=0.001):
     update_ops = []
     for i, var in enumerate(trainable_vars[0:size / 2]):
         target = trainable_vars[size // 2 + i]
-        op = tf.assign(target, tau * var.value() + (1 - tau) * target.value())
+        # op = tf.assign(target, tau * var.value() + (1 - tau) * target.value())
+        op = tf.assign(target, var.value())
         update_ops.append(op)
     return update_ops
 
