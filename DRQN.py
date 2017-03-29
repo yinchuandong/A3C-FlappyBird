@@ -9,11 +9,11 @@ from game.flappy_bird import FlappyBird
 from replay_buffer import ReplayBuffer
 
 INPUT_SIZE = 84
-INPUT_CHANNEL = 1
+INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
-LSTM_UNITS = 512
-LSTM_MAX_STEP = 8
+LSTM_UNITS = 256
+LSTM_MAX_STEP = 5
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.01
@@ -25,8 +25,8 @@ UPDATE_FREQUENCY = 5  # the frequency to update target network
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
-BATCH_SIZE = 4
-REPLAY_MEMORY = 5000
+BATCH_SIZE = 2
+REPLAY_MEMORY = 2000
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
 LOG_FILE = 'tmp_drqn/log'
@@ -49,17 +49,17 @@ class Network(object):
             self.b_conv2 = bias_variable([32])
             h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
 
-            self.W_conv3 = weight_variable([3, 3, 32, 64])
-            self.b_conv3 = bias_variable([64])
-            h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
+            # self.W_conv3 = weight_variable([3, 3, 32, 64])
+            # self.b_conv3 = bias_variable([64])
+            # h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
 
-            h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-            print 'conv flat size:', h_conv3_out_size
-            h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+            h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
+            print 'conv flat size:', h_conv2_out_size
+            h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
 
-            self.W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
+            self.W_fc1 = weight_variable([h_conv2_out_size, LSTM_UNITS])
             self.b_fc1 = bias_variable([LSTM_UNITS])
-            h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, self.W_fc1) + self.b_fc1)
+            h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
 
             # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
             self.timestep = tf.placeholder(dtype=tf.int32)
@@ -102,7 +102,7 @@ class Network(object):
         return [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
-            self.W_conv3, self.b_conv3,
+            # self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
             self.W_lstm, self.b_lstm,
             self.AW, self.VW
@@ -153,7 +153,8 @@ class DRQN(object):
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
+        # self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
+        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
         self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
         clip_grads = [tf.clip_by_norm(grad, 10.0) for grad in self.gradients]
         self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
@@ -310,14 +311,13 @@ def main():
         count = 0
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id, action_q, lstm_state = agent.epsilon_greedy(
-                np.reshape(env.s_t[:, :, -1], (84, 84, 1)), lstm_state)
+            action_id, action_q, lstm_state = agent.epsilon_greedy(env.s_t, lstm_state)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
             action[action_id] = 1
-            state = np.reshape(env.s_t[:, :, -1], (84, 84, 1))
-            next_state = np.reshape(env.s_t1[:, :, -1], (84, 84, 1))
+            state = env.s_t
+            next_state = env.s_t1
             reward = env.reward
             terminal = env.terminal
             # frame skip
