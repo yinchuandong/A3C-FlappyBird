@@ -13,7 +13,7 @@ INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
 LSTM_UNITS = 256
-LSTM_MAX_STEP = 5
+LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
@@ -39,11 +39,12 @@ class Network(object):
         with tf.variable_scope(scope_name) as scope:
             # input layer
             self.state_input = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL])
+            self.norm_input = tf.div(self.state_input, 255.0)
 
             # hidden conv layer
             self.W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
             self.b_conv1 = bias_variable([16])
-            h_conv1 = tf.nn.relu(conv2d(self.state_input, self.W_conv1, 4) + self.b_conv1)
+            h_conv1 = tf.nn.relu(conv2d(self.norm_input, self.W_conv1, 4) + self.b_conv1)
 
             self.W_conv2 = weight_variable([4, 4, 16, 32])
             self.b_conv2 = bias_variable([32])
@@ -159,7 +160,15 @@ class DRQN(object):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM])
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
-        self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
+        self.full_loss = tf.reduce_mean(tf.square(self.y - Q_action))
+        maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        mask = tf.concat([maskA, maskB], axis=1)
+        mask = tf.reshape(mask, [-1])
+
+        # just use a half loss with the mask:[0 0 0 0 1 1 1 1]
+        self.loss = tf.multiply(self.full_loss, mask)
+
         # self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
         self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
