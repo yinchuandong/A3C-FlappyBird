@@ -17,7 +17,7 @@ LSTM_MAX_STEP = 5
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
-INITIAL_EPSILON = 0.0002
+INITIAL_EPSILON = 0.0001
 ALPHA = 1e-4  # the learning rate of optimizer
 TAU = 0.001
 UPDATE_FREQUENCY = 5  # the frequency to update target network
