@@ -271,7 +271,7 @@ class DRQN(object):
                 y_batch.append(reward_batch[i] + GAMMA * np.max(Q_target[i]))
                 # y_batch.append(reward_batch[i] + GAMMA * Q_value[i][Q_action[i]])
 
-        self.session.run(self.apply_gradients, feed_dict={
+        _, loss = self.session.run([self.apply_gradients, self.loss], feed_dict={
             self.y: y_batch,
             self.a: action_batch,
             self.main_net.state_input: state_batch,
@@ -280,6 +280,7 @@ class DRQN(object):
             self.main_net.timestep: LSTM_MAX_STEP
         })
 
+        # print loss
         return
 
     def record_log(self, reward, living_time):
@@ -338,8 +339,7 @@ def main():
             reward = env.reward
             terminal = env.terminal
             # frame skip
-            if count % 3 == 0:
-                episode_buffer.append((state, action, reward, next_state, terminal))
+            episode_buffer.append((state, action, reward, next_state, terminal))
             agent.perceive(state, action, reward, next_state, terminal)
             print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
                 '/epsilon:', agent.epsilon
