@@ -16,9 +16,9 @@ LSTM_UNITS = 256
 LSTM_MAX_STEP = 5
 
 GAMMA = 0.99
-FINAL_EPSILON = 0.01
-INITIAL_EPSILON = 1.0
-ALPHA = 1e-6  # the learning rate of optimizer
+FINAL_EPSILON = 0.0001
+INITIAL_EPSILON = 0.0002
+ALPHA = 1e-4  # the learning rate of optimizer
 TAU = 0.001
 UPDATE_FREQUENCY = 5  # the frequency to update target network
 
@@ -134,7 +134,7 @@ class DRQN(object):
         self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
 
-        self.epsilon = 1 - float(INITIAL_EPSILON - FINAL_EPSILON) \
+        self.epsilon = INITIAL_EPSILON - float(INITIAL_EPSILON - FINAL_EPSILON) \
             * min(self.global_t, EPSILON_TIME_STEP) / float(EPSILON_TIME_STEP)
 
         # for recording the log into tensorboard
@@ -163,7 +163,7 @@ class DRQN(object):
         # self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
         self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
         self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
-        clip_grads = [tf.clip_by_norm(grad, 10.0) for grad in self.gradients]
+        clip_grads = [tf.clip_by_norm(grad, 40.0) for grad in self.gradients]
         self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
         return
 
@@ -174,7 +174,7 @@ class DRQN(object):
         if self.episode_start_time == 0.0:
             self.episode_start_time = time.time()
 
-        if terminal or self.global_t % 10 == 0:
+        if terminal or self.global_t % 20 == 0:
             living_time = time.time() - self.episode_start_time
             self.record_log(self.episode_reward, living_time)
 
