@@ -6,9 +6,7 @@
 
 ### how to use
 1. create `config.PARALLEL_SIZE` game agents in different tab
-
-    * python game_server.py 0
-    
+    * python game_server.py 0 
     * python game_server.py 1
     
     * python game_server.py 2
