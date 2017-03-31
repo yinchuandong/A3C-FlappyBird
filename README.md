@@ -12,6 +12,6 @@
     * python game_server.py 2
     * python game_server.py 3
     
-1. run A3C training agent
+2. run A3C training agent
 
     * python a3c.py
