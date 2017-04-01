@@ -18,18 +18,18 @@ LSTM_MAX_STEP = 8
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
 INITIAL_EPSILON = 0.0001
-ALPHA = 1e-4  # the learning rate of optimizer
+ALPHA = 1e-5  # the learning rate of optimizer
 TAU = 0.001
 UPDATE_FREQUENCY = 5  # the frequency to update target network
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
-BATCH_SIZE = 2
+BATCH_SIZE = 4
 REPLAY_MEMORY = 2000
 
-CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
-LOG_FILE = 'tmp_drqn/log'
+CHECKPOINT_DIR = 'tmp_dqn/checkpoints'
+LOG_FILE = 'tmp_dqn/log'
 
 
 class Network(object):
@@ -50,10 +50,6 @@ class Network(object):
             self.b_conv2 = bias_variable([32])
             h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
 
-            # self.W_conv3 = weight_variable([3, 3, 32, 64])
-            # self.b_conv3 = bias_variable([64])
-            # h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
-
             h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
             print 'conv flat size:', h_conv2_out_size
             h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
@@ -62,46 +58,10 @@ class Network(object):
             self.b_fc1 = bias_variable([LSTM_UNITS])
             h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
 
-            # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
-            self.timestep = tf.placeholder(dtype=tf.int32)
-            self.batch_size = tf.placeholder(dtype=tf.int32)
-
-            h_fc1_reshaped = tf.reshape(h_fc1, [self.batch_size, self.timestep, LSTM_UNITS])
-            self.lstm_cell = tf.contrib.rnn.BasicLSTMCell(num_units=LSTM_UNITS, state_is_tuple=True)
-            self.initial_lstm_state = self.lstm_cell.zero_state(self.batch_size, tf.float32)
-
-            lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(
-                self.lstm_cell,
-                h_fc1_reshaped,
-                initial_state=self.initial_lstm_state,
-                sequence_length=self.timestep,
-                time_major=False,
-                dtype=tf.float32,
-                scope=scope
-            )
-            print 'lstm shape:', lstm_outputs.get_shape()
-            # shape: [batch_size*timestep, LSTM_UNITS]
-            lstm_outputs = tf.reshape(lstm_outputs, [-1, LSTM_UNITS])
-
-            # option1: for separate channel
-            # streamA, streamV = tf.split(lstm_outputs, 2, axis=1)
-            # self.AW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, ACTIONS_DIM]))
-            # self.VW = tf.Variable(tf.random_normal([LSTM_UNITS / 2, 1]))
-            # advantage = tf.matmul(streamA, self.AW)
-            # value = tf.matmul(streamV, self.VW)
-            # self.Q_value = value + tf.subtract(advantage, tf.reduce_mean(advantage, axis=1, keep_dims=True))
-
-            # option2: for fully-connected
             self.W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
             self.b_fc2 = bias_variable([ACTIONS_DIM])
-            self.Q_value = tf.matmul(lstm_outputs, self.W_fc2) + self.b_fc2
-
+            self.Q_value = tf.matmul(h_fc1, self.W_fc2) + self.b_fc2
             self.Q_action = tf.argmax(self.Q_value, 1)
-            print 'Q shape:', self.Q_value.get_shape()
-
-            scope.reuse_variables()
-            self.W_lstm = tf.get_variable("basic_lstm_cell/weights")
-            self.b_lstm = tf.get_variable("basic_lstm_cell/biases")
 
         return
 
@@ -109,10 +69,7 @@ class Network(object):
         return [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
-            # self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
-            self.W_lstm, self.b_lstm,
-            # self.AW, self.VW
             self.W_fc2, self.b_fc2,
         ]
 
@@ -160,20 +117,14 @@ class DRQN(object):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM])
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
-        self.full_loss = tf.reduce_mean(tf.square(self.y - Q_action))
-        maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        mask = tf.concat([maskA, maskB], axis=1)
-        mask = tf.reshape(mask, [-1])
+        self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
 
-        # just use a half loss with the mask:[0 0 0 0 1 1 1 1]
-        self.loss = tf.multiply(self.full_loss, mask)
-
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
-        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
-        self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
-        clip_grads = [tf.clip_by_norm(grad, 40.0) for grad in self.gradients]
-        self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
+        # self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
+        self.apply_gradients = self.optimizer.minimize(self.loss)
+        # self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
+        # clip_grads = [tf.clip_by_norm(grad, 40.0) for grad in self.gradients]
+        # self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
         return
 
     def perceive(self, state, action, reward, next_state, terminal):
@@ -198,17 +149,14 @@ class DRQN(object):
             self.backup()
         return
 
-    def epsilon_greedy(self, state, lstm_state_in):
+    def epsilon_greedy(self, state):
         """
         :param state: 1x84x84x3
         """
-        Q_value_t, lstm_state_out = self.session.run(
-            [self.main_net.Q_value, self.main_net.lstm_state],
+        Q_value_t = self.session.run(
+            [self.main_net.Q_value],
             feed_dict={
                 self.main_net.state_input: [state],
-                self.main_net.initial_lstm_state: lstm_state_in,
-                self.main_net.batch_size: 1,
-                self.main_net.timestep: 1
             })
         Q_value_t = Q_value_t[0]
         action_index = 0
@@ -221,7 +169,7 @@ class DRQN(object):
         if self.epsilon > FINAL_EPSILON:
             self.epsilon -= EPSILON_ANNEAL
         max_q_value = np.max(Q_value_t)
-        return action_index, max_q_value, lstm_state_out
+        return action_index, max_q_value
 
     def train_Q_network(self):
         '''
@@ -243,22 +191,16 @@ class DRQN(object):
         terminal_batch = [t[4] for t in minibatch]
 
         y_batch = []
-        # todo: need to feed with batch_size, timestep, lstm_state
-        lstm_state_train = (np.zeros([BATCH_SIZE, LSTM_UNITS]), np.zeros([BATCH_SIZE, LSTM_UNITS]))
         Q_target = self.session.run(
-            self.main_net.Q_value,
+            self.target_net.Q_value,
             feed_dict={
-                self.main_net.state_input: next_state_batch,
-                self.main_net.initial_lstm_state: lstm_state_train,
-                self.main_net.batch_size: BATCH_SIZE,
-                self.main_net.timestep: LSTM_MAX_STEP
+                self.target_net.state_input: next_state_batch,
             }
         )
         # Q_action = self.session.run(
         #     self.target_net.Q_action,
         #     feed_dict={
         #         self.target_net.state_input: next_state_batch,
-        #         self.target_net.initial_lstm_state: lstm_state_train,
         #         self.target_net.batch_size: BATCH_SIZE,
         #         self.target_net.timestep: LSTM_MAX_STEP
         #     }
@@ -275,9 +217,6 @@ class DRQN(object):
             self.y: y_batch,
             self.a: action_batch,
             self.main_net.state_input: state_batch,
-            self.main_net.initial_lstm_state: lstm_state_train,
-            self.main_net.batch_size: BATCH_SIZE,
-            self.main_net.timestep: LSTM_MAX_STEP
         })
 
         # print loss
@@ -325,11 +264,10 @@ def main():
 
     while True:
         episode_buffer = []
-        lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
         count = 0
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id, action_q, lstm_state = agent.epsilon_greedy(env.s_t, lstm_state)
+            action_id, action_q = agent.epsilon_greedy(env.s_t)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
