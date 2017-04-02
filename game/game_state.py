@@ -39,9 +39,9 @@ class GameState:
         self.terminal = terminal
         return
 
-    def process(self, actionId):
+    def process(self, action_id):
         action = np.zeros([2])
-        action[actionId] = 1
+        action[action_id] = 1
         x_t1, reward, terminal = self.frame_step(action)
         x_t1 = np.reshape(x_t1, (84, 84, 1))
         self.s_t1 = np.append(self.s_t[:, :, 1:], x_t1, axis=2)

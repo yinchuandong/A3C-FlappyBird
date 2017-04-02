@@ -161,7 +161,6 @@ class FlappyBird:
         action[0] = 1
         x_t, reward, terminal = self.frame_step(action)
         self.s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
-        # self.s_t = self.s_t / 255.0
         self.reward = reward
         self.terminal = terminal
         return
@@ -171,7 +170,6 @@ class FlappyBird:
         action[action_id] = 1
         x_t1, reward, terminal = self.frame_step(action)
         x_t1 = np.reshape(x_t1, (84, 84, 1))
-        # x_t1 = x_t1 / 255.0
         self.s_t1 = np.append(self.s_t[:, :, 1:], x_t1, axis=2)
         self.reward = reward
         self.terminal = terminal

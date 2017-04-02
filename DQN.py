@@ -17,8 +17,8 @@ LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
-INITIAL_EPSILON = 0.0001
-ALPHA = 1e-5  # the learning rate of optimizer
+INITIAL_EPSILON = 0.5
+ALPHA = 1e-6  # the learning rate of optimizer
 TAU = 0.001
 UPDATE_FREQUENCY = 5  # the frequency to update target network
 
@@ -154,7 +154,7 @@ class DRQN(object):
         :param state: 1x84x84x3
         """
         Q_value_t = self.session.run(
-            [self.main_net.Q_value],
+            self.main_net.Q_value,
             feed_dict={
                 self.main_net.state_input: [state],
             })
@@ -177,8 +177,8 @@ class DRQN(object):
         '''
         # len(minibatch) = BATCH_SIZE * LSTM_MAX_STEP
 
-        if self.global_t % (UPDATE_FREQUENCY * 1000) == 0:
-            update_target(self.session, self.target_ops)
+        # if self.global_t % (UPDATE_FREQUENCY * 1000) == 0:
+        #     update_target(self.session, self.target_ops)
 
         # limit the training frequency
         # if self.global_t % UPDATE_FREQUENCY != 0:
@@ -192,20 +192,13 @@ class DRQN(object):
 
         y_batch = []
         Q_target = self.session.run(
-            self.target_net.Q_value,
+            self.main_net.Q_value,
             feed_dict={
-                self.target_net.state_input: next_state_batch,
+                self.main_net.state_input: next_state_batch,
             }
         )
-        # Q_action = self.session.run(
-        #     self.target_net.Q_action,
-        #     feed_dict={
-        #         self.target_net.state_input: next_state_batch,
-        #         self.target_net.batch_size: BATCH_SIZE,
-        #         self.target_net.timestep: LSTM_MAX_STEP
-        #     }
-        # )
-        for i in range(len(state_batch)):
+
+        for i in range(len(minibatch)):
             terminal = terminal_batch[i]
             if terminal:
                 y_batch.append(reward_batch[i])
@@ -264,7 +257,6 @@ def main():
 
     while True:
         episode_buffer = []
-        count = 0
         while not env.terminal:
             # action_id = random.randint(0, 1)
             action_id, action_q = agent.epsilon_greedy(env.s_t)
@@ -288,7 +280,6 @@ def main():
                 agent.replay_buffer.add(episode_buffer)
                 episode_buffer = []
                 print '----------- episode buffer > 100---------'
-            count += 1
         # reset the state
         env.reset()
         if len(episode_buffer) > LSTM_MAX_STEP:
