@@ -30,7 +30,7 @@ class ReplayBuffer(object):
     def add(self, episode_buffer):
         '''
         note: each element in replay buffer is an array, contains a series of episodes
-            like: [(s, a, r, d, s1)]
+            like: [(s, a, r, s1, d)]
         '''
         self.buffer.append(episode_buffer)
         return

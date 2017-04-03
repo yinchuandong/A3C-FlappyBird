@@ -6,27 +6,25 @@ import os
 import sys
 from netutil import *
 from game.flappy_bird import FlappyBird
-from replay_buffer import ReplayBuffer
+from collections import deque
+
 
 INPUT_SIZE = 84
 INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
-LSTM_UNITS = 256
-LSTM_MAX_STEP = 8
+LSTM_UNITS = 512
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
 INITIAL_EPSILON = 0.5
 ALPHA = 1e-6  # the learning rate of optimizer
-TAU = 0.001
-UPDATE_FREQUENCY = 5  # the frequency to update target network
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
-BATCH_SIZE = 4
-REPLAY_MEMORY = 2000
+BATCH_SIZE = 32
+REPLAY_MEMORY = 20000
 
 CHECKPOINT_DIR = 'tmp_dqn/checkpoints'
 LOG_FILE = 'tmp_dqn/log'
@@ -39,29 +37,30 @@ class Network(object):
         with tf.variable_scope(scope_name) as scope:
             # input layer
             self.state_input = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL])
-            self.norm_input = tf.div(self.state_input, 255.0)
 
             # hidden conv layer
-            self.W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
-            self.b_conv1 = bias_variable([16])
-            h_conv1 = tf.nn.relu(conv2d(self.norm_input, self.W_conv1, 4) + self.b_conv1)
+            self.W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32])
+            self.b_conv1 = bias_variable([32])
+            h_conv1 = tf.nn.relu(conv2d(self.state_input, self.W_conv1, 4) + self.b_conv1)
 
-            self.W_conv2 = weight_variable([4, 4, 16, 32])
-            self.b_conv2 = bias_variable([32])
+            self.W_conv2 = weight_variable([4, 4, 32, 64])
+            self.b_conv2 = bias_variable([64])
             h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
 
-            h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
-            print 'conv flat size:', h_conv2_out_size
-            h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
+            self.W_conv3 = weight_variable([3, 3, 64, 64])
+            self.b_conv3 = bias_variable([64])
+            h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
 
-            self.W_fc1 = weight_variable([h_conv2_out_size, LSTM_UNITS])
+            h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
+            h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+
+            self.W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
             self.b_fc1 = bias_variable([LSTM_UNITS])
-            h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+            h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, self.W_fc1) + self.b_fc1)
 
             self.W_fc2 = weight_variable([LSTM_UNITS, ACTIONS_DIM])
             self.b_fc2 = bias_variable([ACTIONS_DIM])
             self.Q_value = tf.matmul(h_fc1, self.W_fc2) + self.b_fc2
-            self.Q_action = tf.argmax(self.Q_value, 1)
 
         return
 
@@ -74,11 +73,11 @@ class Network(object):
         ]
 
 
-class DRQN(object):
+class DQN(object):
 
     def __init__(self):
         self.global_t = 0
-        self.replay_buffer = ReplayBuffer(REPLAY_MEMORY)
+        self.replay_buffer = deque(maxlen=REPLAY_MEMORY)
 
         # q-network parameter
         self.create_network()
@@ -87,7 +86,6 @@ class DRQN(object):
         # init session
         self.session = tf.InteractiveSession()
         self.session.run(tf.global_variables_initializer())
-        update_target(self.session, self.target_ops)
 
         self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
@@ -110,7 +108,6 @@ class DRQN(object):
     def create_network(self):
         self.main_net = Network(scope_name='main')
         self.target_net = Network(scope_name='target')
-        self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
         return
 
     def create_minimize(self):
@@ -130,6 +127,8 @@ class DRQN(object):
     def perceive(self, state, action, reward, next_state, terminal):
         self.global_t += 1
 
+        self.replay_buffer.append((state, action, reward, next_state, terminal))
+
         self.episode_reward += reward
         if self.episode_start_time == 0.0:
             self.episode_start_time = time.time()
@@ -142,7 +141,7 @@ class DRQN(object):
             self.episode_reward = 0.0
             self.episode_start_time = time.time()
 
-        if self.replay_buffer.size() > BATCH_SIZE:
+        if len(self.replay_buffer) > BATCH_SIZE:
             self.train_Q_network()
 
         if self.global_t % 100000 == 0:
@@ -177,13 +176,7 @@ class DRQN(object):
         '''
         # len(minibatch) = BATCH_SIZE * LSTM_MAX_STEP
 
-        # if self.global_t % (UPDATE_FREQUENCY * 1000) == 0:
-        #     update_target(self.session, self.target_ops)
-
-        # limit the training frequency
-        # if self.global_t % UPDATE_FREQUENCY != 0:
-        #     return
-        minibatch = self.replay_buffer.sample(BATCH_SIZE, LSTM_MAX_STEP)
+        minibatch = random.sample(self.replay_buffer, BATCH_SIZE)
         state_batch = [t[0] for t in minibatch]
         action_batch = [t[1] for t in minibatch]
         reward_batch = [t[2] for t in minibatch]
@@ -252,40 +245,30 @@ def main():
     '''
     the function for training
     '''
-    agent = DRQN()
+    agent = DQN()
     env = FlappyBird()
+    env.reset()
 
     while True:
-        episode_buffer = []
-        while not env.terminal:
-            # action_id = random.randint(0, 1)
-            action_id, action_q = agent.epsilon_greedy(env.s_t)
-            env.process(action_id)
+        action_id, action_q = agent.epsilon_greedy(env.s_t)
+        env.process(action_id)
 
-            action = np.zeros(ACTIONS_DIM)
-            action[action_id] = 1
-            state = env.s_t
-            next_state = env.s_t1
-            reward = env.reward
-            terminal = env.terminal
-            # frame skip
-            episode_buffer.append((state, action, reward, next_state, terminal))
-            agent.perceive(state, action, reward, next_state, terminal)
-            print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
-                '/epsilon:', agent.epsilon
+        action = np.zeros(ACTIONS_DIM)
+        action[action_id] = 1
+        state = env.s_t
+        next_state = env.s_t1
+        reward = env.reward
+        terminal = env.terminal
 
-            env.update()
-            if len(episode_buffer) >= 50:
-                # start a new episode buffer, in case of an over-long memory
-                agent.replay_buffer.add(episode_buffer)
-                episode_buffer = []
-                print '----------- episode buffer > 100---------'
-        # reset the state
-        env.reset()
-        if len(episode_buffer) > LSTM_MAX_STEP:
-            agent.replay_buffer.add(episode_buffer)
-        print 'episode_buffer', len(episode_buffer)
-        print 'replay_buffer.size:', agent.replay_buffer.size()
+        agent.perceive(state, action, reward, next_state, terminal)
+
+        if agent.global_t % 10:
+            print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
+                '/ action:', action_id, '/ reward:', reward, '/ q_value:', action_q
+
+        if terminal:
+            env.reset()
+        env.update()
         # break
     return
 
