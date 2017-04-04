@@ -7,7 +7,7 @@ from collections import deque
 from netutil import *
 from game.flappy_bird import FlappyBird
 
-INPUT_SIZE = 84
+INPUT_SIZE = 80
 INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
