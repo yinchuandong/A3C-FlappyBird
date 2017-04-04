@@ -17,7 +17,7 @@ SCREENHEIGHT = 512
 class FlappyBird:
     def __init__(self):
         pygame.init()
-        
+
         self.FPSCLOCK = pygame.time.Clock()
         self.SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
         pygame.display.set_caption('Flappy Bird')
@@ -124,8 +124,8 @@ class FlappyBird:
 
         # check if crash here
         isCrash = self.checkCrash({'x': self.playerx, 'y': self.playery,
-                              'index': self.playerIndex},
-                             self.upperPipes, self.lowerPipes)
+                                   'index': self.playerIndex},
+                                  self.upperPipes, self.lowerPipes)
         if isCrash:
             # SOUNDS['hit'].play()
             # SOUNDS['die'].play()
@@ -146,7 +146,8 @@ class FlappyBird:
                          (self.playerx, self.playery))
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
-        image_data = Image.fromarray(image_data).convert('L')
+        image_data = Image.fromarray(image_data).convert('L')  # grayscale
+        image_data = image_data.point(lambda x: 0 if x < 128 else 255, '1')  # binarize
         image_data = image_data.resize((84, 84), Image.ANTIALIAS)
         # image_data.save('tmp.png')
 
