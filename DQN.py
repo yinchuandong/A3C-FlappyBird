@@ -17,7 +17,7 @@ LSTM_UNITS = 512
 
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
-INITIAL_EPSILON = 0.5
+INITIAL_EPSILON = 0.0001
 ALPHA = 1e-6  # the learning rate of optimizer
 
 MAX_TIME_STEP = 10 * 10 ** 7
