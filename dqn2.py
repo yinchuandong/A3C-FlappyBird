@@ -125,7 +125,7 @@ class DQN(object):
         return
 
     def get_action_index(self, state):
-        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: state})[0]
+        Q_value_t = self.session.run(self.Q_value, feed_dict={self.s: [state]})[0]
         return np.argmax(Q_value_t), np.max(Q_value_t)
 
     def epsilon_greedy(self, state):
@@ -183,6 +183,7 @@ class DQN(object):
             self.time_input: living_time
         })
         self.summary_writer.add_summary(summary_str, self.global_t)
+        self.summary_writer.flush()
         return
 
     def restore(self):
