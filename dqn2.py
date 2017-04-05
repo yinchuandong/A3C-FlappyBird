@@ -215,12 +215,15 @@ def main():
     game = FlappyBird()
     game.reset()
 
+    s_t = game.s_t
+
     while agent.global_t < MAX_TIME_STEP:
-        action_id, action_q = agent.epsilon_greedy(game.s_t)
+        action_id, action_q = agent.epsilon_greedy(s_t)
         game.process(action_id)
         action = np.zeros(ACTIONS_DIM)
         action[action_id] = 1
-        agent.perceive(game.s_t, action, game.reward, game.s_t1, game.terminal)
+        s_t1, reward, terminal = (game.s_t1, game.reward, game.terminal)
+        agent.perceive(s_t, action, reward, s_t1, terminal)
 
         if agent.global_t % 10 == 0:
             print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', game.terminal, \
@@ -229,7 +232,8 @@ def main():
         if game.terminal:
             game.reset()
         # s_t <- s_t1
-        game.update()
+        s_t = s_t1
+        # game.update()
 
     return
 
