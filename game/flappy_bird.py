@@ -7,7 +7,7 @@ import pygame.surfarray as surfarray
 from pygame.locals import *
 from itertools import cycle
 
-from PIL import Image
+import cv2
 
 FPS = 60
 SCREENWIDTH = 288
@@ -147,10 +147,8 @@ class FlappyBird:
                          (self.playerx, self.playery))
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
-        image_data = Image.fromarray(image_data).convert('L')  # grayscale
-        image_data = image_data.point(lambda x: 0 if x < 128 else 255, '1')  # binarize
-        image_data = image_data.resize((THUMB_W, THUMB_W), Image.ANTIALIAS)
-        # image_data.save('tmp.png')
+        image_data = cv2.cvtColor(cv2.resize(image_data, (THUMB_W, THUMB_W)), cv2.COLOR_BGR2GRAY)
+        ret, image_data = cv2.threshold(image_data, 1, 255, cv2.THRESH_BINARY)
 
         pygame.display.update()
         self.FPSCLOCK.tick(FPS)
