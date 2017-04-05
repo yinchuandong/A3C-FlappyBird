@@ -12,7 +12,7 @@ import cv2
 FPS = 60
 SCREENWIDTH = 288
 SCREENHEIGHT = 512
-THUMB_W = 80
+THUMB_W = 84
 
 
 class FlappyBird:

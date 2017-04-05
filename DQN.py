@@ -249,18 +249,17 @@ def main():
     env = FlappyBird()
     env.reset()
 
+    s_t = env.s_t
+
     while True:
         action_id, action_q = agent.epsilon_greedy(env.s_t)
         env.process(action_id)
 
         action = np.zeros(ACTIONS_DIM)
         action[action_id] = 1
-        state = env.s_t
-        next_state = env.s_t1
-        reward = env.reward
-        terminal = env.terminal
 
-        agent.perceive(state, action, reward, next_state, terminal)
+        s_t1, reward, terminal = (env.s_t1, env.reward, env.terminal)
+        agent.perceive(s_t, action, reward, s_t1, terminal)
 
         if agent.global_t % 10:
             print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
@@ -268,7 +267,8 @@ def main():
 
         if terminal:
             env.reset()
-        env.update()
+        s_t = s_t1
+        # env.update()  # it doesn't work, and cause Q NaN
         # break
     return
 
