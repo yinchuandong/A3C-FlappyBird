@@ -324,35 +324,32 @@ def main():
     env = FlappyBird()
 
     while True:
+        env.reset()
         episode_buffer = []
         lstm_state = (np.zeros([1, LSTM_UNITS]), np.zeros([1, LSTM_UNITS]))
-        count = 0
+        s_t = env.s_t
         while not env.terminal:
             # action_id = random.randint(0, 1)
-            action_id, action_q, lstm_state = agent.epsilon_greedy(env.s_t, lstm_state)
+            action_id, action_q, lstm_state = agent.epsilon_greedy(s_t, lstm_state)
             env.process(action_id)
 
             action = np.zeros(ACTIONS_DIM)
             action[action_id] = 1
-            state = env.s_t
-            next_state = env.s_t1
-            reward = env.reward
-            terminal = env.terminal
+            s_t1, reward, terminal = (env.s_t1, env.reward, env.terminal)
             # frame skip
-            episode_buffer.append((state, action, reward, next_state, terminal))
-            agent.perceive(state, action, reward, next_state, terminal)
+            episode_buffer.append((s_t, action, reward, s_t1, terminal))
+            agent.perceive(s_t, action, reward, s_t1, terminal)
             print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
                 '/epsilon:', agent.epsilon
 
-            env.update()
+            # s_t <- s_t1
+            s_t = s_t1
             if len(episode_buffer) >= 50:
                 # start a new episode buffer, in case of an over-long memory
                 agent.replay_buffer.add(episode_buffer)
                 episode_buffer = []
                 print '----------- episode buffer > 100---------'
-            count += 1
         # reset the state
-        env.reset()
         if len(episode_buffer) > LSTM_MAX_STEP:
             agent.replay_buffer.add(episode_buffer)
         print 'episode_buffer', len(episode_buffer)

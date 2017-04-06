@@ -252,7 +252,7 @@ def main():
     s_t = env.s_t
 
     while True:
-        action_id, action_q = agent.epsilon_greedy(env.s_t)
+        action_id, action_q = agent.epsilon_greedy(s_t)
         env.process(action_id)
 
         action = np.zeros(ACTIONS_DIM)
