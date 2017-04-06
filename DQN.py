@@ -263,7 +263,7 @@ def main():
         s_t1, reward, terminal = (env.s_t1, env.reward, env.terminal)
         agent.perceive(s_t, action, reward, s_t1, terminal)
 
-        if agent.global_t % 10:
+        if agent.global_t % 10 == 0:
             print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
                 '/ action:', action_id, '/ reward:', reward, '/ q_value:', action_q
 

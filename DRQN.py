@@ -39,28 +39,28 @@ class Network(object):
         with tf.variable_scope(scope_name) as scope:
             # input layer
             self.state_input = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL])
-            self.norm_input = tf.div(self.state_input, 255.0)
 
             # hidden conv layer
-            self.W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 16])
-            self.b_conv1 = bias_variable([16])
-            h_conv1 = tf.nn.relu(conv2d(self.norm_input, self.W_conv1, 4) + self.b_conv1)
+            self.W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32])
+            self.b_conv1 = bias_variable([32])
+            h_conv1 = tf.nn.relu(conv2d(self.state_input, self.W_conv1, 4) + self.b_conv1)
 
-            self.W_conv2 = weight_variable([4, 4, 16, 32])
-            self.b_conv2 = bias_variable([32])
-            h_conv2 = tf.nn.relu(conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
+            h_poo1 = max_pool_2x2(h_conv1)
 
-            # self.W_conv3 = weight_variable([3, 3, 32, 64])
-            # self.b_conv3 = bias_variable([64])
-            # h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
+            self.W_conv2 = weight_variable([4, 4, 32, 64])
+            self.b_conv2 = bias_variable([64])
+            h_conv2 = tf.nn.relu(conv2d(h_poo1, self.W_conv2, 2) + self.b_conv2)
 
-            h_conv2_out_size = np.prod(h_conv2.get_shape().as_list()[1:])
-            print 'conv flat size:', h_conv2_out_size
-            h_conv2_flat = tf.reshape(h_conv2, [-1, h_conv2_out_size])
+            self.W_conv3 = weight_variable([3, 3, 64, 64])
+            self.b_conv3 = bias_variable([64])
+            h_conv3 = tf.nn.relu(conv2d(h_conv2, self.W_conv3, 1) + self.b_conv3)
 
-            self.W_fc1 = weight_variable([h_conv2_out_size, LSTM_UNITS])
+            h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
+            h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+
+            self.W_fc1 = weight_variable([h_conv3_out_size, LSTM_UNITS])
             self.b_fc1 = bias_variable([LSTM_UNITS])
-            h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+            h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, self.W_fc1) + self.b_fc1)
 
             # reshape to fit lstm (batch_size, timestep, LSTM_UNITS)
             self.timestep = tf.placeholder(dtype=tf.int32)
@@ -109,7 +109,7 @@ class Network(object):
         return [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
-            # self.W_conv3, self.b_conv3,
+            self.W_conv3, self.b_conv3,
             self.W_fc1, self.b_fc1,
             self.W_lstm, self.b_lstm,
             # self.AW, self.VW
@@ -130,7 +130,7 @@ class DRQN(object):
         # init session
         self.session = tf.InteractiveSession()
         self.session.run(tf.global_variables_initializer())
-        update_target(self.session, self.target_ops)
+        # update_target(self.session, self.target_ops)
 
         self.saver = tf.train.Saver(tf.global_variables())
         self.restore()
@@ -153,7 +153,7 @@ class DRQN(object):
     def create_network(self):
         self.main_net = Network(scope_name='main')
         self.target_net = Network(scope_name='target')
-        self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
+        # self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
         return
 
     def create_minimize(self):
@@ -229,8 +229,8 @@ class DRQN(object):
         '''
         # len(minibatch) = BATCH_SIZE * LSTM_MAX_STEP
 
-        if self.global_t % (UPDATE_FREQUENCY * 1000) == 0:
-            update_target(self.session, self.target_ops)
+        # if self.global_t % (UPDATE_FREQUENCY * 1000) == 0:
+        #     update_target(self.session, self.target_ops)
 
         # limit the training frequency
         # if self.global_t % UPDATE_FREQUENCY != 0:
@@ -339,8 +339,9 @@ def main():
             # frame skip
             episode_buffer.append((s_t, action, reward, s_t1, terminal))
             agent.perceive(s_t, action, reward, s_t1, terminal)
-            print 'global_t:', agent.global_t, '/terminal:', terminal, '/action_q', action_q, \
-                '/epsilon:', agent.epsilon
+            if agent.global_t % 10 == 0:
+                print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
+                    '/ action:', action_id, '/ reward:', reward, '/ q_value:', action_q
 
             # s_t <- s_t1
             s_t = s_t1
