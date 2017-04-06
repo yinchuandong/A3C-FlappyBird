@@ -18,14 +18,14 @@ LSTM_MAX_STEP = 8
 GAMMA = 0.99
 FINAL_EPSILON = 0.0001
 INITIAL_EPSILON = 0.0001
-ALPHA = 1e-4  # the learning rate of optimizer
+ALPHA = 1e-6  # the learning rate of optimizer
 TAU = 0.001
 UPDATE_FREQUENCY = 5  # the frequency to update target network
 
 MAX_TIME_STEP = 10 * 10 ** 7
 EPSILON_TIME_STEP = 1 * 10 ** 6  # for annealing the epsilon greedy
 EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
-BATCH_SIZE = 2
+BATCH_SIZE = 4
 REPLAY_MEMORY = 2000
 
 CHECKPOINT_DIR = 'tmp_drqn/checkpoints'
