@@ -152,7 +152,7 @@ class DRQN(object):
 
     def create_network(self):
         self.main_net = Network(scope_name='main')
-        self.target_net = Network(scope_name='target')
+        # self.target_net = Network(scope_name='target')
         # self.target_ops = update_target_graph_op(tf.trainable_variables(), TAU)
         return
 
@@ -161,19 +161,21 @@ class DRQN(object):
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
         self.full_loss = tf.reduce_mean(tf.square(self.y - Q_action))
-        maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        mask = tf.concat([maskA, maskB], axis=1)
-        mask = tf.reshape(mask, [-1])
+        # maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        # maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        # mask = tf.concat([maskA, maskB], axis=1)
+        # mask = tf.reshape(mask, [-1])
 
         # just use a half loss with the mask:[0 0 0 0 1 1 1 1]
-        self.loss = tf.multiply(self.full_loss, mask)
+        # self.loss = tf.multiply(self.full_loss, mask)
 
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
-        self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
-        self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
-        clip_grads = [tf.clip_by_norm(grad, 40.0) for grad in self.gradients]
-        self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
+        self.apply_gradients = self.optimizer.minimize(self.full_loss)
+
+        # self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
+        # self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
+        # clip_grads = [tf.clip_by_norm(grad, 40.0) for grad in self.gradients]
+        # self.apply_gradients = self.optimizer.apply_gradients(zip(clip_grads, self.main_net.get_vars()))
         return
 
     def perceive(self, state, action, reward, next_state, terminal):
