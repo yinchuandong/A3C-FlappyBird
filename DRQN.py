@@ -273,7 +273,7 @@ class DRQN(object):
                 y_batch.append(reward_batch[i] + GAMMA * np.max(Q_target[i]))
                 # y_batch.append(reward_batch[i] + GAMMA * Q_value[i][Q_action[i]])
 
-        _, loss = self.session.run([self.apply_gradients, self.loss], feed_dict={
+        self.session.run(self.apply_gradients, feed_dict={
             self.y: y_batch,
             self.a: action_batch,
             self.main_net.state_input: state_batch,
