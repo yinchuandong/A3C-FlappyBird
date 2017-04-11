@@ -12,7 +12,7 @@ INPUT_SIZE = 84
 INPUT_CHANNEL = 4
 ACTIONS_DIM = 2
 
-LSTM_UNITS = 256
+LSTM_UNITS = 512
 LSTM_MAX_STEP = 8
 
 GAMMA = 0.99
@@ -161,16 +161,16 @@ class DRQN(object):
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.main_net.Q_value, self.a), axis=1)
         self.full_loss = tf.reduce_mean(tf.square(self.y - Q_action))
-        # maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        # maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
-        # mask = tf.concat([maskA, maskB], axis=1)
-        # mask = tf.reshape(mask, [-1])
+        maskA = tf.zeros([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        maskB = tf.ones([BATCH_SIZE, LSTM_MAX_STEP // 2])
+        mask = tf.concat([maskA, maskB], axis=1)
+        mask = tf.reshape(mask, [-1])
 
         # just use a half loss with the mask:[0 0 0 0 1 1 1 1]
-        # self.loss = tf.multiply(self.full_loss, mask)
+        self.loss = tf.multiply(self.full_loss, mask)
 
         self.optimizer = tf.train.AdamOptimizer(learning_rate=ALPHA)
-        self.apply_gradients = self.optimizer.minimize(self.full_loss)
+        self.apply_gradients = self.optimizer.minimize(self.loss)
 
         # self.optimizer = tf.train.RMSPropOptimizer(learning_rate=ALPHA, decay=0.99)
         # self.gradients = tf.gradients(self.loss, self.main_net.get_vars())
