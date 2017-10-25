@@ -225,10 +225,11 @@ def create_process_fn(use_rgb=False):
         if crop_area is not None:
             img = img.crop(crop_area)
         if not use_rgb:
-            img = img.convert('L')
+            # img = img.convert('L')
+            img = img.convert('1')
             # img = img.convert('L').point(lambda p: p > 100 and 255)
             img = np.reshape(img, (img.size[1], img.size[0], 1))
-            return img
+            return img.astype(np.uint8)
         else:
             return np.array(img)
     return f
@@ -259,7 +260,7 @@ def main():
             action[action_id] = 1
             agent.perceive(s_t, action, reward, s_t1, terminal)
 
-            if agent.global_t % 10 == 0:
+            if agent.global_t % 100 == 0 or terminal or reward == 1.0:
                 print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
                     '/ action:', action_id, '/ reward:', reward, '/ q_value:', action_q
 
