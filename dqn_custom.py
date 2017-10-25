@@ -4,7 +4,7 @@ import random
 import time
 import os
 from collections import deque
-from netutil import *
+from netutil import conv_variable, fc_variable, conv2d, flatten_conv_layer, max_pool_2x2
 from customgame import CustomFlappyBird
 from PIL import Image
 
@@ -64,31 +64,23 @@ class DQN(object):
         s = tf.placeholder('float', shape=[None, INPUT_SIZE, INPUT_SIZE, INPUT_CHANNEL], name='s')
 
         # hidden conv layer
-        W_conv1 = weight_variable([8, 8, INPUT_CHANNEL, 32])
-        b_conv1 = bias_variable([32])
+        W_conv1, b_conv1 = conv_variable([8, 8, INPUT_CHANNEL, 32], "conv1")
         h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
 
         h_poo1 = max_pool_2x2(h_conv1)
 
-        W_conv2 = weight_variable([4, 4, 32, 64])
-        b_conv2 = bias_variable([64])
+        W_conv2, b_conv2 = conv_variable([4, 4, 32, 64], "conv2")
         h_conv2 = tf.nn.relu(conv2d(h_poo1, W_conv2, 2) + b_conv2)
 
-        W_conv3 = weight_variable([3, 3, 64, 64])
-        b_conv3 = bias_variable([64])
+        W_conv3, b_conv3 = conv_variable([3, 3, 64, 64], "conv3")
         h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
 
-        h_conv3_out_size = np.prod(h_conv3.get_shape().as_list()[1:])
-        print h_conv3_out_size
-        h_conv3_flat = tf.reshape(h_conv3, [-1, h_conv3_out_size])
+        h_conv3_out_size, h_conv3_flat = flatten_conv_layer(h_conv3)
 
-        W_fc1 = weight_variable([h_conv3_out_size, 512])
-        b_fc1 = bias_variable([512])
+        W_fc1, b_fc1 = fc_variable([h_conv3_out_size, 512], "fc1")
         h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
 
-        # readout layer: Q_value
-        W_fc2 = weight_variable([512, ACTIONS_DIM])
-        b_fc2 = bias_variable([ACTIONS_DIM])
+        W_fc2, b_fc2 = fc_variable([512, ACTIONS_DIM], "fc2")
         Q_value = tf.matmul(h_fc1, W_fc2) + b_fc2
 
         self.s = s
