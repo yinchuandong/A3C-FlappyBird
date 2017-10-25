@@ -226,8 +226,9 @@ def create_process_fn(use_rgb=False):
             img = img.crop(crop_area)
         if not use_rgb:
             # img = img.convert('L')
-            img = img.convert('1')
+            # img = img.convert('1')
             # img = img.convert('L').point(lambda p: p > 100 and 255)
+            img = img.convert('L').point(lambda p: p > 100)
             img = np.reshape(img, (img.size[1], img.size[0], 1))
             return img.astype(np.uint8)
         else:
@@ -235,10 +236,30 @@ def create_process_fn(use_rgb=False):
     return f
 
 
+def test():
+    process_fn = create_process_fn(use_rgb=False)
+    img = Image.open('tmp2.png')
+    img = np.array(img)
+    img = process_fn(img)
+    img = img.reshape([84, 84])
+    Image.fromarray(img).save("tmp2-bin.png")
+
+    # import cv2
+    # image_data = cv2.imread("tmp2.png")
+    # image_data = cv2.cvtColor(cv2.resize(image_data, (84, 84)), cv2.COLOR_BGR2GRAY)
+    # ret, image_data = cv2.threshold(image_data, 1, 255, cv2.THRESH_BINARY)
+
+    # cv2.imwrite("tmp2-bin-cv2.png", image_data)
+    return
+
+
 def main():
     '''
     the function for training
     '''
+
+    # test()
+    # return
     agent = DQN()
     env = CustomFlappyBird()
     process_fn = create_process_fn(use_rgb=False)
@@ -270,5 +291,4 @@ def main():
 
 
 if __name__ == '__main__':
-    print 'dd'
     main()
