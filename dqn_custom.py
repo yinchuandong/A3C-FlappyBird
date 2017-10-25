@@ -24,8 +24,8 @@ EPSILON_ANNEAL = float(INITIAL_EPSILON - FINAL_EPSILON) / EPSILON_TIME_STEP
 REPLAY_MEMORY = 50000
 BATCH_SIZE = 32
 
-CHECKPOINT_DIR = 'tmp_dqn2/checkpoints'
-LOG_FILE = 'tmp_dqn2/log'
+CHECKPOINT_DIR = 'tmp_dqn_cus/checkpoints'
+LOG_FILE = 'tmp_dqn_cus/log'
 
 
 class DQN(object):
@@ -35,11 +35,20 @@ class DQN(object):
         self.replay_buffer = deque(maxlen=REPLAY_MEMORY)
 
         # q-network parameter
-        self.create_network()
-        self.create_minimize()
+        with tf.device("/gpu:0"), tf.variable_scope("net"):
+            self.create_network()
+            self.create_minimize()
 
         # init session
-        self.session = tf.InteractiveSession()
+        # self.session = tf.InteractiveSession()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+        sess_config = tf.ConfigProto(
+            # intra_op_parallelism_threads=NUM_THREADS
+            log_device_placement=False,
+            allow_soft_placement=True,
+            gpu_options=gpu_options
+        )
+        self.session = tf.Session(config=sess_config)
         self.session.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver(tf.global_variables())
@@ -91,9 +100,20 @@ class DQN(object):
         self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM])
         self.y = tf.placeholder('float', shape=[None])
         Q_action = tf.reduce_sum(tf.multiply(self.Q_value, self.a), reduction_indices=1)
+
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
-        self.optimizer = tf.train.AdamOptimizer(ALPHA)
-        self.apply_gradients = self.optimizer.minimize(self.loss)
+        # self.loss = tf.reduce_mean(tf.abs(self.y - Q_action))
+
+        optimizer = tf.train.AdamOptimizer(ALPHA)
+
+        # vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="net")
+        # for v in vars:
+        #     print vars
+        # gradients = tf.gradients(self.loss, vars)
+        # gradients_clipped = [tf.clip_by_norm(grad, 10.0) for grad in gradients]
+        # self.apply_gradients = optimizer.apply_gradients(zip(gradients_clipped, vars))
+
+        self.apply_gradients = optimizer.minimize(self.loss)
         return
 
     def perceive(self, state, action, reward, next_state, terminal):
@@ -219,8 +239,8 @@ def create_process_fn(use_rgb=False):
         if not use_rgb:
             # img = img.convert('L')
             # img = img.convert('1')
-            # img = img.convert('L').point(lambda p: p > 100 and 255)
-            img = img.convert('L').point(lambda p: p > 100)
+            img = img.convert('L').point(lambda p: p > 100 and 255)
+            # img = img.convert('L').point(lambda p: p > 100)
             img = np.reshape(img, (img.size[1], img.size[0], 1))
             return img.astype(np.uint8)
         else:
