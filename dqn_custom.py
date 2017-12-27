@@ -97,9 +97,11 @@ class DQN(object):
         return
 
     def create_minimize(self):
-        self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM])
+        # self.a = tf.placeholder('float', shape=[None, ACTIONS_DIM])
+        self.a = tf.placeholder(tf.int32, shape=[None])
+        a_onehot = tf.one_hot(self.a, ACTIONS_DIM)
         self.y = tf.placeholder('float', shape=[None])
-        Q_action = tf.reduce_sum(tf.multiply(self.Q_value, self.a), reduction_indices=1)
+        Q_action = tf.reduce_sum(tf.multiply(self.Q_value, a_onehot), axis=1)
 
         self.loss = tf.reduce_mean(tf.square(self.y - Q_action))
         # self.loss = tf.reduce_mean(tf.abs(self.y - Q_action))
@@ -289,9 +291,9 @@ def main():
             o_t1 = process_fn(o_t1)
             s_t1 = np.concatenate([s_t[:, :, 1:], o_t1], axis=2)
 
-            action = np.zeros(ACTIONS_DIM)
-            action[action_id] = 1
-            agent.perceive(s_t, action, reward, s_t1, terminal)
+            # action = np.zeros(ACTIONS_DIM)
+            # action[action_id] = 1
+            agent.perceive(s_t, action_id, reward, s_t1, terminal)
 
             if agent.global_t % 100 == 0 or terminal or reward == 1.0:
                 print 'global_t:', agent.global_t, '/ epsilon:', agent.epsilon, '/ terminal:', terminal, \
