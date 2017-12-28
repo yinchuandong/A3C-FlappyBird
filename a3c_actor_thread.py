@@ -85,7 +85,6 @@ class A3CActorThread(object):
         batch_state = []
         batch_action = []
         batch_reward = []
-        batch_value = []
 
         terminal_end = False
         # reduce the influence of socket connecting time
@@ -100,10 +99,9 @@ class A3CActorThread(object):
             start_lstm_state = self.local_network.lstm_state_out
 
         for i in range(LOCAL_T_MAX):
-            policy_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
+            policy_ = self.local_network.run_policy(sess, self.game_state.s_t)
             if self.thread_index == 0 and self.local_t % 1000 == 0:
                 print 'policy=', policy_
-                print 'value=', value_
 
             action_id = self.choose_action(policy_)
 
@@ -111,7 +109,6 @@ class A3CActorThread(object):
             action_onehot[action_id] = 1
             batch_state.append(self.game_state.s_t)
             batch_action.append(action_onehot)
-            batch_value.append(value_)
 
             self.game_state.process(action_id)
             reward = self.game_state.reward
@@ -161,7 +158,7 @@ class A3CActorThread(object):
 
         # print("=" * 60)
         # print(batch_value)
-        # print(self._run_batch_value(sess, batch_state, start_lstm_state))
+        # print(self.local_network.run_batch_value(sess, batch_state, start_lstm_state))
         # print("=" * 60)
         # import sys
         # sys.exit()
