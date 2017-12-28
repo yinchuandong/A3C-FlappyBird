@@ -71,11 +71,21 @@ class A3CActorThread(object):
         summary_writer.flush()
         return
 
+    def _discount_accum_reward(self, rewards, running_add=0.0, gamma=0.99):
+        """ discounted the reward using gamma
+        """
+        discounted_r = np.zeros_like(rewards, dtype=np.float32)
+        for t in reversed(range(len(rewards))):
+            running_add = rewards[t] + running_add * gamma
+            discounted_r[t] = running_add
+
+        return list(discounted_r)
+
     def process(self, sess, global_t, summary_writer, summary_op, reward_input, time_input):
-        states = []
-        actions = []
-        rewards = []
-        values = []
+        batch_state = []
+        batch_action = []
+        batch_reward = []
+        batch_value = []
 
         terminal_end = False
         # reduce the influence of socket connecting time
@@ -97,16 +107,18 @@ class A3CActorThread(object):
 
             action_id = self.choose_action(policy_)
 
-            states.append(self.game_state.s_t)
-            actions.append(action_id)
-            values.append(value_)
+            action_onehot = np.zeros([ACTION_DIM])
+            action_onehot[action_id] = 1
+            batch_state.append(self.game_state.s_t)
+            batch_action.append(action_onehot)
+            batch_value.append(value_)
 
             self.game_state.process(action_id)
             reward = self.game_state.reward
             terminal = self.game_state.terminal
 
             self.episode_reward += reward
-            rewards.append(np.clip(reward, -1.0, 1.0))
+            batch_reward.append(np.clip(reward, -1.0, 1.0))
 
             self.local_t += 1
 
@@ -142,49 +154,18 @@ class A3CActorThread(object):
             R = self.local_network.run_value(sess, self.game_state.s_t)
         # print ('global_t: %d, R: %f') % (global_t, R)
 
-        states.reverse()
-        actions.reverse()
-        rewards.reverse()
-        values.reverse()
-
-        batch_state = []
-        batch_action = []
-        batch_td = []
-        batch_R = []
-
-        for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
-            R = ri + GAMMA * R
-            td = R - Vi
-            action = np.zeros([ACTION_DIM])
-            action[ai] = 1
-
-            batch_state.append(si)
-            batch_action.append(action)
-            batch_td.append(td)
-            batch_R.append(R)
-
+        batch_value = self.local_network.run_batch_value(sess, batch_state, start_lstm_state)
+        batch_R = self._discount_accum_reward(batch_reward, R, GAMMA)
+        batch_td = np.array(batch_R) - np.array(batch_value)
         cur_learning_rate = self._anneal_learning_rate(global_t)
-        batch_state.reverse()
-        batch_action.reverse()
-        batch_td.reverse()
-        batch_R.reverse()
 
-        # batch_td2 = sess.run(self.local_network.td2, feed_dict={
-        #     self.local_network.state_input: batch_state,
-        #     self.local_network.action_input: batch_action,
-        #     self.local_network.td: batch_td,
-        #     self.local_network.R: batch_R,
-        #     self.local_network.step_size: [len(batch_state)],
-        #     self.local_network.initial_lstm_state: start_lstm_state,
-        #     self.learning_rate_input: cur_learning_rate
-        # })
-        # print "-" * 60
-        # print np.array(batch_td).astype(np.float32)
-        # print "-" * 60
-        # print batch_td2
-        # print "-" * 60
+        # print("=" * 60)
+        # print(batch_value)
+        # print(self._run_batch_value(sess, batch_state, start_lstm_state))
+        # print("=" * 60)
         # import sys
         # sys.exit()
+
         if USE_LSTM:
             sess.run(self.apply_gradients, feed_dict={
                 self.local_network.state_input: batch_state,

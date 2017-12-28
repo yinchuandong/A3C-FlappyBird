@@ -276,6 +276,16 @@ class A3CLSTMNetwork(A3CNetwork):
         self.lstm_state_out = prev_lstm_state_out
         return value[0]
 
+    def run_batch_value(self, sess, states, initial_lstm_state):
+        feed_dict = {
+            self.state_input: states,
+            self.step_size: [len(states)],
+            self.initial_lstm_state: initial_lstm_state,
+        }
+
+        values = sess.run(self.value_output, feed_dict=feed_dict)
+        return values
+
 
 if __name__ == '__main__':
     # net = A3CFFNetwork(84, 3, 2)
