@@ -22,8 +22,6 @@ class A3CNetwork(object):
         # temporary difference (R-V)  (input for policy)
         self.td = tf.placeholder(tf.float32, [None], name="td")
 
-        self.td2 = self.R - self.value_output
-
         # avoid NaN
         log_pi = tf.log(tf.clip_by_value(self.policy_output, 1e-20, 1.0))
         # policy entropy
@@ -32,7 +30,7 @@ class A3CNetwork(object):
         # (Adding minus, because the original paper's objective function is for gradient ascent,
         # but we use gradient descent optimizer.)
         policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.multiply(log_pi, self.action_input),
-                                                   axis=1) * self.td2 + entropy * entropy_beta)
+                                                   axis=1) * self.td + entropy * entropy_beta)
 
         # value loss (output) L = (R-V)^2
         # value_loss = tf.reduce_mean(tf.square(self.R - self.value_output))
