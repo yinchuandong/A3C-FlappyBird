@@ -16,9 +16,13 @@ class A3CNetwork(object):
 
     def create_loss(self, entropy_beta):
         # taken action (input for policy)
-        self.action_input = tf.placeholder('float', [None, self._action_dim])
+        self.action_input = tf.placeholder(tf.float32, [None, self._action_dim], name="actions")
+        # R (input for value)
+        self.R = tf.placeholder(tf.float32, [None], name="R")
         # temporary difference (R-V)  (input for policy)
-        self.td = tf.placeholder('float', [None])
+        self.td = tf.placeholder(tf.float32, [None], name="td")
+
+        self.td2 = self.R - self.value_output
 
         # avoid NaN
         log_pi = tf.log(tf.clip_by_value(self.policy_output, 1e-20, 1.0))
@@ -28,13 +32,12 @@ class A3CNetwork(object):
         # (Adding minus, because the original paper's objective function is for gradient ascent,
         # but we use gradient descent optimizer.)
         policy_loss = -tf.reduce_sum(tf.reduce_sum(tf.multiply(log_pi, self.action_input),
-                                                   axis=1) * self.td + entropy * entropy_beta)
+                                                   axis=1) * self.td2 + entropy * entropy_beta)
 
-        # R (input for value)
-        self.R = tf.placeholder('float', [None])
         # value loss (output) L = (R-V)^2
         # value_loss = tf.reduce_mean(tf.square(self.R - self.value_output))
         value_loss = 0.5 * tf.nn.l2_loss(self.R - self.value_output)
+        # value_loss = 0.5 * tf.nn.l2_loss(self.td)
 
         self.total_loss = policy_loss + value_loss
         return
@@ -158,6 +161,7 @@ class A3CLSTMNetwork(A3CNetwork):
         with tf.device(self._device), tf.variable_scope(scope_name) as scope:
             # state input
             self.state_input = tf.placeholder('float', [None, state_dim, state_dim, state_chn])
+            self.state_input = self.state_input / 255.0
 
             # conv1
             self.W_conv1 = weight_variable([8, 8, state_chn, 16])

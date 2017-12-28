@@ -164,11 +164,28 @@ class A3CActorThread(object):
             batch_R.append(R)
 
         cur_learning_rate = self._anneal_learning_rate(global_t)
+        batch_state.reverse()
+        batch_action.reverse()
+        batch_td.reverse()
+        batch_R.reverse()
+
+        # batch_td2 = sess.run(self.local_network.td2, feed_dict={
+        #     self.local_network.state_input: batch_state,
+        #     self.local_network.action_input: batch_action,
+        #     self.local_network.td: batch_td,
+        #     self.local_network.R: batch_R,
+        #     self.local_network.step_size: [len(batch_state)],
+        #     self.local_network.initial_lstm_state: start_lstm_state,
+        #     self.learning_rate_input: cur_learning_rate
+        # })
+        # print "-" * 60
+        # print np.array(batch_td).astype(np.float32)
+        # print "-" * 60
+        # print batch_td2
+        # print "-" * 60
+        # import sys
+        # sys.exit()
         if USE_LSTM:
-            batch_state.reverse()
-            batch_action.reverse()
-            batch_td.reverse()
-            batch_R.reverse()
             sess.run(self.apply_gradients, feed_dict={
                 self.local_network.state_input: batch_state,
                 self.local_network.action_input: batch_action,
