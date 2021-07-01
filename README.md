@@ -1,5 +1,11 @@
 ## this repository is under construction
 
+## Demo
+[https://youtu.be/QLY35pm78PY](https://youtu.be/QLY35pm78PY)
+
+[![Video](https://img.youtube.com/vi/QLY35pm78PY/0.jpg)](https://www.youtube.com/watch?v=QLY35pm78PY)
+
+
 #### requirements (recommend anaoncoda python)
     tensorflow=1.0.0
     pygame=1.9.2rc1
